@@ -1204,12 +1204,42 @@ select.form-input option{background:#fff;}
             <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">ติดตามสถานะการผลิตตามขั้นตอน Jig &amp; Fixture</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <select class="form-input" id="prod-proj-filter" onchange="loadProduction()" style="width:180px;font-size:13px;">
-              <option value="">— ทุก Project —</option>
-            </select>
             <button class="btn btn-ghost btn-sm" onclick="loadProduction()">🔄 Refresh</button>
           </div>
         </div>
+
+        <!-- KPI Bar -->
+        <div id="prod-kpi-bar" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
+
+        <!-- Bottleneck Alert -->
+        <div id="prod-bottleneck-alert" style="display:none;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:10px 16px;margin-bottom:14px;align-items:center;gap:10px;">
+          <span style="font-size:18px;">🚨</span>
+          <div>
+            <div style="font-weight:700;color:#b91c1c;font-size:13px;" id="prod-alert-title"></div>
+            <div style="font-size:12px;color:#dc2626;" id="prod-alert-body"></div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+          <span style="font-size:13px;">🔍</span>
+          <input type="text" id="prod-search" placeholder="ค้นหา Task, Project..." oninput="filterProduction()"
+            style="flex:1;min-width:160px;border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px;outline:none;background:var(--bg);">
+          <select id="prod-customer-filter" onchange="filterProduction()"
+            style="border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px;background:var(--bg);cursor:pointer;">
+            <option value="">🏭 ทุก Customer</option>
+          </select>
+          <select id="prod-staff-filter" onchange="filterProduction()"
+            style="border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px;background:var(--bg);cursor:pointer;">
+            <option value="">👤 ทุก Staff</option>
+          </select>
+          <select class="form-input" id="prod-proj-filter" onchange="loadProduction()" style="width:160px;font-size:13px;">
+            <option value="">— ทุก Project —</option>
+          </select>
+          <button onclick="clearProdFilters()"
+            style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);cursor:pointer;color:var(--text-muted);">✕ ล้าง</button>
+        </div>
+
         <div id="prod-board" style="overflow-x:auto;padding-bottom:12px;">
           <div style="color:var(--text-muted);padding:24px;text-align:center;">⏳ กำลังโหลด...</div>
         </div>
@@ -2614,17 +2644,21 @@ function exportProjectsPrint(){
   let html=`<html><head><meta charset="utf-8"><title>Projects Export</title>
   <style>body{font-family:sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}th{background:#f1f3f9;font-weight:700;}tr:nth-child(even){background:#f9fafb;}
 /* ── Production Board ── */
-.prod-board{display:flex;gap:14px;min-width:max-content;padding-bottom:8px;}
-.prod-col{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;width:160px;flex-shrink:0;overflow:hidden;transition:border-color .15s,box-shadow .15s;}
-.prod-col-head{padding:10px 12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-.prod-col-body{padding:8px;min-height:120px;display:flex;flex-direction:column;gap:7px;border-radius:0 0 10px 10px;transition:background .15s;}
-.prod-col-body.drag-over{background:#eef2ff;outline:2px dashed var(--primary);outline-offset:-4px;}
-.prod-card{background:#fff;border:1.5px solid var(--border);border-radius:7px;padding:8px 10px;font-size:12px;cursor:grab;transition:box-shadow .15s,transform .15s,opacity .15s;}
-.prod-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);}
-.prod-card.dragging{opacity:.35;transform:scale(.97) rotate(1.5deg);box-shadow:0 8px 24px rgba(99,102,241,.25);cursor:grabbing;border-color:var(--primary);}
-.prod-card-title{font-weight:600;margin-bottom:3px;line-height:1.3;}
-.prod-card-proj{font-size:11px;color:var(--text-muted);}
-.prod-card-assign{font-size:10px;color:var(--primary);margin-top:4px;font-weight:600;}
+.prod-board{display:flex;gap:16px;min-width:max-content;padding-bottom:16px;align-items:flex-start;}
+.prod-col{background:#f8fafc;border:1.5px solid var(--border);border-radius:14px;width:210px;flex-shrink:0;overflow:hidden;transition:border-color .2s,box-shadow .2s;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.prod-col:hover{box-shadow:0 4px 16px rgba(0,0,0,.10);}
+.prod-col-head{padding:12px 14px 10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:14px 14px 0 0;}
+.prod-col-head-label{display:flex;align-items:center;gap:6px;}
+.prod-col-head-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.prod-col-body{padding:10px;min-height:140px;display:flex;flex-direction:column;gap:8px;border-radius:0 0 14px 14px;transition:background .15s,outline .15s;}
+.prod-col-body.drag-over{background:#eef2ff;outline:2.5px dashed var(--primary);outline-offset:-4px;}
+.prod-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;cursor:grab;transition:box-shadow .15s,transform .15s,opacity .15s,border-color .15s;user-select:none;}
+.prod-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.10);transform:translateY(-2px);border-color:#a5b4fc;}
+.prod-card.dragging{opacity:.3;transform:scale(.96) rotate(1deg);box-shadow:0 10px 30px rgba(99,102,241,.3);cursor:grabbing;border-color:var(--primary);background:#f5f3ff;}
+.prod-card-title{font-weight:700;margin-bottom:4px;line-height:1.4;color:var(--text);font-size:12.5px;}
+.prod-card-proj{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prod-card-assign{font-size:11px;color:var(--primary);margin-top:6px;font-weight:600;display:flex;align-items:center;gap:4px;}
+.prod-card-empty{color:var(--text-muted);font-size:11px;text-align:center;padding:16px 0;opacity:.5;border:1.5px dashed #e2e8f0;border-radius:8px;background:#fafafa;}
 .prod-drop-zone{border:2px dashed var(--primary);border-radius:7px;height:50px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--primary);display:none;}
 /* ── QC Records ── */
 .qc-result-pass{background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;}
@@ -3951,10 +3985,12 @@ const PROD_STAGES = [
   { key:'delivery',       label:'Delivery',       color:'#0891b2' },
 ];
 
+let _prodAllTasks = [];
+
 async function loadProduction(){
   const board = document.getElementById('prod-board');
   if(!board) return;
-  // Populate project filter
+  board.innerHTML = '<div style="color:var(--text-muted);padding:24px;text-align:center;">⏳ กำลังโหลด...</div>';
   const sel = document.getElementById('prod-proj-filter');
   if(sel && sel.options.length <= 1){
     try{
@@ -3966,60 +4002,162 @@ async function loadProduction(){
   }
   const projFilter = sel ? sel.value : '';
   try{
-    let q = sb.from('tasks').select('id,name,production_stage,status,project_id,projects(name),assignee_id,team_members(name)').neq('status','done');
+    let q = sb.from('tasks')
+      .select('id,name,production_stage,status,priority,updated_at,project_id,projects(name),assignee_id,team_members(name)')
+      .neq('status','done');
     if(projFilter) q = q.eq('project_id', projFilter);
     const {data:tasks,error} = await q.order('name');
     if(error){board.innerHTML='<div style="color:#ef4444;padding:20px;">Error: '+error.message+'</div>';return;}
-    const grouped={};
-    PROD_STAGES.forEach(s=>{ grouped[s.key]=[]; });
-    grouped['backlog']=[];
-    (tasks||[]).forEach(t=>{
-      const stage = t.production_stage||'backlog';
-      if(!grouped[stage]) grouped[stage]=[];
-      grouped[stage].push(t);
+    _prodAllTasks = (tasks||[]).map(t=>{
+      const assignee = t.team_members ? (Array.isArray(t.team_members)?t.team_members[0]?.name:t.team_members.name)||'' : '';
+      const proj = t.projects ? (Array.isArray(t.projects)?t.projects[0]?.name:t.projects.name)||'' : '';
+      return {...t, _assignee:assignee, _proj:proj};
     });
-    const stagesShown = [{key:'backlog',label:'Backlog',color:'#64748b'}, ...PROD_STAGES];
-    let html = '<div class="prod-board">';
-    stagesShown.forEach(st=>{
-      const cards=(grouped[st.key]||[]);
-      html += `<div class="prod-col" id="pcol-${st.key}">
-        <div class="prod-col-head" style="border-bottom-color:${st.color};color:${st.color};">
-          <span>${st.label}</span>
-          <span style="background:${st.color};color:#fff;border-radius:12px;padding:1px 7px;font-size:10px;">${cards.length}</span>
-        </div>
-        <div class="prod-col-body" id="pcbody-${st.key}" ondragover="event.preventDefault();this.classList.add('drag-over');" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('drag-over');" ondrop="dropProdCard(event,'${st.key}')">`;
-      if(cards.length===0){
-        html += `<div style="color:var(--text-muted);font-size:11px;text-align:center;padding:12px 0;opacity:.6;">— ว่าง —</div>`;
-      } else {
-        cards.forEach(t=>{
-          const assignee = t.team_members ? (Array.isArray(t.team_members)?t.team_members[0]?.name:t.team_members.name)||'' : '';
-          const proj = t.projects ? (Array.isArray(t.projects)?t.projects[0]?.name:t.projects.name)||'' : '';
-          html += `<div class="prod-card" draggable="true" id="pcard-${t.id}"
-            ondragstart="this.classList.add('dragging');event.dataTransfer.setData('taskId','${t.id}');event.dataTransfer.setData('fromStage','${st.key}');" ondragend="document.querySelectorAll('.prod-card.dragging').forEach(c=>c.classList.remove('dragging'));"
-            onclick="openTaskFromProd(${t.id})">
-            <div class="prod-card-title">${t.name}</div>
-            <div class="prod-card-proj">${proj}</div>
-            ${assignee?`<div class="prod-card-assign">👤 ${assignee}</div>`:''}
-          </div>`;
-        });
-      }
-      html += `</div></div>`;
-    });
-    html += '</div>';
-    board.innerHTML = html;
+    _prodPopulateFilters(_prodAllTasks);
+    _prodRender(_prodAllTasks);
   }catch(e){board.innerHTML='<div style="color:#ef4444;padding:20px;">Error: '+e.message+'</div>';}
 }
 
-async function dropProdCard(e, toStage){
+function _prodPopulateFilters(tasks){
+  const custSel = document.getElementById('prod-customer-filter');
+  const staffSel = document.getElementById('prod-staff-filter');
+  if(!custSel||!staffSel) return;
+  const curCust=custSel.value, curStaff=staffSel.value;
+  const custs = [...new Set(tasks.map(t=>t._proj).filter(Boolean))].sort();
+  const staffs = [...new Set(tasks.map(t=>t._assignee).filter(Boolean))].sort();
+  custSel.innerHTML = '<option value="">🏭 ทุก Customer</option>' +
+    custs.map(c=>`<option value="${c}" ${c===curCust?'selected':''}>${c}</option>`).join('');
+  staffSel.innerHTML = '<option value="">👤 ทุก Staff</option>' +
+    staffs.map(s=>`<option value="${s}" ${s===curStaff?'selected':''}>${s}</option>`).join('');
+}
+
+function filterProduction(){
+  const q=(document.getElementById('prod-search')?.value||'').toLowerCase();
+  const cust=document.getElementById('prod-customer-filter')?.value||'';
+  const staff=document.getElementById('prod-staff-filter')?.value||'';
+  const filtered=_prodAllTasks.filter(t=>{
+    const mQ=!q||t.name.toLowerCase().includes(q)||t._proj.toLowerCase().includes(q)||t._assignee.toLowerCase().includes(q);
+    return mQ&&(!cust||t._proj===cust)&&(!staff||t._assignee===staff);
+  });
+  _prodRender(filtered);
+}
+
+function clearProdFilters(){
+  ['prod-search','prod-customer-filter','prod-staff-filter'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  _prodRender(_prodAllTasks);
+}
+
+function _prodDaysSince(iso){
+  if(!iso) return 0;
+  return (Date.now()-new Date(iso).getTime())/86400000;
+}
+
+function _prodIsBottleneck(t){
+  const stage=t.production_stage||'backlog';
+  return stage!=='delivery'&&_prodDaysSince(t.updated_at)>3;
+}
+
+function _prodRender(tasks){
+  const board=document.getElementById('prod-board');
+  if(!board) return;
+
+  const total=tasks.length;
+  const bottlenecks=tasks.filter(_prodIsBottleneck);
+  const delayed=bottlenecks.length;
+  const completedToday=_prodAllTasks.filter(t=>(t.production_stage||'')==='delivery'&&_prodDaysSince(t.updated_at)<1).length;
+  const highPri=tasks.filter(t=>t.priority==='high').length;
+
+  const kpiEl=document.getElementById('prod-kpi-bar');
+  if(kpiEl){
+    kpiEl.innerHTML=[
+      {icon:'📦',label:'Total Tasks',val:total,color:'#2563eb',bg:'#eff6ff'},
+      {icon:'🚨',label:'Delayed >3d',val:delayed,color:'#dc2626',bg:'#fef2f2'},
+      {icon:'✅',label:'Done Today',val:completedToday,color:'#059669',bg:'#ecfdf5'},
+      {icon:'⚡',label:'High Priority',val:highPri,color:'#d97706',bg:'#fffbeb'},
+    ].map(k=>`<div style="background:${k.bg};border:1.5px solid ${k.color}33;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:22px;">${k.icon}</div>
+      <div><div style="font-size:24px;font-weight:900;color:${k.color};line-height:1;">${k.val}</div>
+      <div style="font-size:11px;color:${k.color};opacity:.75;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;">${k.label}</div>
+    </div></div>`).join('');
+  }
+
+  const alertEl=document.getElementById('prod-bottleneck-alert');
+  if(alertEl){
+    if(delayed>0){
+      alertEl.style.display='flex';
+      document.getElementById('prod-alert-title').textContent='พบ '+delayed+' Task ที่ค้างนานเกิน 3 วัน';
+      document.getElementById('prod-alert-body').textContent=
+        bottlenecks.slice(0,3).map(t=>'"'+t.name+'"').join(', ')+(delayed>3?' และอีก '+(delayed-3)+' รายการ':'');
+    } else {
+      alertEl.style.display='none';
+    }
+  }
+
+  const grouped={};
+  PROD_STAGES.forEach(s=>{grouped[s.key]=[];});
+  grouped['backlog']=[];
+  tasks.forEach(t=>{
+    const stage=t.production_stage||'backlog';
+    if(!grouped[stage]) grouped[stage]=[];
+    grouped[stage].push(t);
+  });
+
+  const stagesShown=[{key:'backlog',label:'Backlog',color:'#64748b'},...PROD_STAGES];
+  let html='<div class="prod-board">';
+  stagesShown.forEach(st=>{
+    const cards=grouped[st.key]||[];
+    const stageStuck=cards.filter(_prodIsBottleneck).length;
+    html+=`<div class="prod-col" id="pcol-${st.key}">
+      <div class="prod-col-head" style="border-bottom-color:${st.color};">
+        <div class="prod-col-head-label">
+          <span class="prod-col-head-dot" style="background:${st.color};"></span>
+          <span style="color:${st.color};">${st.label}</span>
+          ${stageStuck>0?`<span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:800;">🚨${stageStuck}</span>`:''}
+        </div>
+        <span style="background:${st.color}22;color:${st.color};border-radius:12px;padding:2px 9px;font-size:11px;font-weight:800;">${cards.length}</span>
+      </div>
+      <div class="prod-col-body" id="pcbody-${st.key}"
+        ondragover="event.preventDefault();this.classList.add('drag-over');"
+        ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('drag-over');"
+        ondrop="dropProdCard(event,'${st.key}')">`;
+    if(!cards.length){
+      html+=`<div class="prod-card-empty">— ว่าง —</div>`;
+    } else {
+      cards.forEach(t=>{
+        const stuck=_prodIsBottleneck(t);
+        const days=Math.floor(_prodDaysSince(t.updated_at));
+        const cardStyle=stuck?'border:2px solid #ef4444;box-shadow:0 0 0 3px #fca5a530;':'';
+        const stuckTag=stuck?`<div style="background:#fef2f2;border-bottom:1px solid #fca5a5;margin:-10px -12px 8px;padding:4px 10px;border-radius:8px 8px 0 0;font-size:11px;font-weight:700;color:#dc2626;">🚨 ค้างมา ${days} วัน</div>`:'';
+        html+=`<div class="prod-card" draggable="true" id="pcard-${t.id}" style="${cardStyle}"
+          ondragstart="this.classList.add('dragging');event.dataTransfer.setData('taskId','${t.id}');event.dataTransfer.setData('fromStage','${st.key}');"
+          ondragend="document.querySelectorAll('.prod-card.dragging').forEach(c=>c.classList.remove('dragging'));"
+          onclick="openTaskFromProd(${t.id})">
+          ${stuckTag}
+          <div class="prod-card-title">${t.name}</div>
+          <div class="prod-card-proj">${t._proj}</div>
+          ${t._assignee?`<div class="prod-card-assign"><span style="width:18px;height:18px;border-radius:50%;background:var(--primary);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;">${t._assignee[0].toUpperCase()}</span>${t._assignee}</div>`:''}
+          ${days>0?`<div style="font-size:10px;color:${stuck?'#dc2626':'var(--text-muted)'};margin-top:5px;">🕐 ${days} วันที่แล้ว</div>`:''}
+        </div>`;
+      });
+    }
+    html+=`</div></div>`;
+  });
+  html+='</div>';
+  board.innerHTML=html;
+}
+
+async function dropProdCard(e,toStage){
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
   document.querySelectorAll('.prod-card.dragging').forEach(c=>c.classList.remove('dragging'));
-  const taskId = e.dataTransfer.getData('taskId');
+  const taskId=e.dataTransfer.getData('taskId');
   if(!taskId) return;
   try{
-    await sb.from('tasks').update({production_stage:toStage}).eq('id',taskId);
+    await sb.from('tasks').update({production_stage:toStage,updated_at:new Date().toISOString()}).eq('id',taskId);
     loadProduction();
-  }catch(err){ alert('Error: '+err.message); }
+  }catch(err){alert('Error: '+err.message);}
 }
 
 function openTaskFromProd(taskId){
