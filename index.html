@@ -1201,7 +1201,7 @@ select.form-input option{background:#fff;}
         <div class="page-header">
           <div>
             <div class="page-title">🏭 Production Stage Board</div>
-            <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">ติดตามสถานะการผลิตตามขั้นตอน Jig &amp; Fixture</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">ติดตามสถานะการผลิตแบบ Real-time · ลากการ์ดเพื่อย้าย Stage ได้เลย</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-ghost btn-sm" onclick="loadProduction()">🔄 Refresh</button>
@@ -2644,21 +2644,47 @@ function exportProjectsPrint(){
   let html=`<html><head><meta charset="utf-8"><title>Projects Export</title>
   <style>body{font-family:sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}th{background:#f1f3f9;font-weight:700;}tr:nth-child(even){background:#f9fafb;}
 /* ── Production Board ── */
-.prod-board{display:flex;gap:16px;min-width:max-content;padding-bottom:16px;align-items:flex-start;}
-.prod-col{background:#f8fafc;border:1.5px solid var(--border);border-radius:14px;width:210px;flex-shrink:0;overflow:hidden;transition:border-color .2s,box-shadow .2s;box-shadow:0 1px 4px rgba(0,0,0,.06);}
-.prod-col:hover{box-shadow:0 4px 16px rgba(0,0,0,.10);}
-.prod-col-head{padding:12px 14px 10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:14px 14px 0 0;}
-.prod-col-head-label{display:flex;align-items:center;gap:6px;}
-.prod-col-head-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
-.prod-col-body{padding:10px;min-height:140px;display:flex;flex-direction:column;gap:8px;border-radius:0 0 14px 14px;transition:background .15s,outline .15s;}
+/* ════════════ PRODUCTION STAGE BOARD — REDESIGN ════════════ */
+.prod-board{display:flex;gap:14px;min-width:max-content;padding-bottom:20px;align-items:flex-start;}
+
+/* Column */
+.prod-col{background:#f8fafc;border:1.5px solid var(--border);border-radius:16px;width:220px;flex-shrink:0;overflow:hidden;transition:box-shadow .2s;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.prod-col:hover{box-shadow:0 6px 20px rgba(0,0,0,.10);}
+
+/* Column Header */
+.prod-col-head{padding:0;border-bottom:none;display:flex;flex-direction:column;background:#fff;border-radius:16px 16px 0 0;overflow:hidden;}
+.prod-col-head-top{padding:11px 14px 10px;display:flex;justify-content:space-between;align-items:center;}
+.prod-col-head-bar{height:4px;width:100%;}
+.prod-col-head-label{display:flex;align-items:center;gap:7px;}
+.prod-col-head-icon{font-size:15px;line-height:1;}
+.prod-col-head-name{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;}
+.prod-col-head-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+
+/* Column Body */
+.prod-col-body{padding:10px;min-height:160px;display:flex;flex-direction:column;gap:8px;border-radius:0 0 16px 16px;transition:background .15s,outline .15s;}
 .prod-col-body.drag-over{background:#eef2ff;outline:2.5px dashed var(--primary);outline-offset:-4px;}
-.prod-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;cursor:grab;transition:box-shadow .15s,transform .15s,opacity .15s,border-color .15s;user-select:none;}
-.prod-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.10);transform:translateY(-2px);border-color:#a5b4fc;}
-.prod-card.dragging{opacity:.3;transform:scale(.96) rotate(1deg);box-shadow:0 10px 30px rgba(99,102,241,.3);cursor:grabbing;border-color:var(--primary);background:#f5f3ff;}
-.prod-card-title{font-weight:700;margin-bottom:4px;line-height:1.4;color:var(--text);font-size:12.5px;}
-.prod-card-proj{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.prod-card-assign{font-size:11px;color:var(--primary);margin-top:6px;font-weight:600;display:flex;align-items:center;gap:4px;}
-.prod-card-empty{color:var(--text-muted);font-size:11px;text-align:center;padding:16px 0;opacity:.5;border:1.5px dashed #e2e8f0;border-radius:8px;background:#fafafa;}
+
+/* Card */
+.prod-card{background:#fff;border:1.5px solid #e8edf3;border-radius:12px;padding:0;font-size:13px;cursor:grab;transition:box-shadow .18s,transform .18s,opacity .15s,border-color .15s;user-select:none;overflow:hidden;position:relative;}
+.prod-card:hover{box-shadow:0 6px 18px rgba(0,0,0,.11);transform:translateY(-2px);border-color:#a5b4fc;}
+.prod-card.dragging{opacity:.25;transform:scale(.95) rotate(1.5deg);box-shadow:0 12px 32px rgba(99,102,241,.25);cursor:grabbing;}
+.prod-card-priority-bar{height:3px;width:100%;}
+.prod-card-body{padding:10px 12px 11px;}
+.prod-card-title{font-weight:700;margin-bottom:5px;line-height:1.45;color:#1e293b;font-size:12.5px;}
+.prod-card-proj{font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px;}
+.prod-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:7px;border-top:1px solid #f1f5f9;}
+.prod-card-assign{font-size:11px;color:var(--primary);font-weight:600;display:flex;align-items:center;gap:5px;}
+.prod-card-assign-av{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0;}
+.prod-card-days{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;}
+.prod-card-stuck{background:#fef2f2;border-bottom:1px solid #fca5a5;padding:5px 12px;font-size:11px;font-weight:700;color:#dc2626;display:flex;align-items:center;gap:5px;}
+.prod-card-empty{color:#94a3b8;font-size:11px;text-align:center;padding:20px 12px;border:1.5px dashed #e2e8f0;border-radius:10px;background:#fafbfc;line-height:1.6;}
+
+/* KPI Bar */
+.prod-kpi-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:box-shadow .2s;}
+.prod-kpi-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.09);}
+.prod-kpi-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.prod-kpi-val{font-size:26px;font-weight:900;line-height:1;}
+.prod-kpi-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;opacity:.7;}
 .prod-drop-zone{border:2px dashed var(--primary);border-radius:7px;height:50px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--primary);display:none;}
 /* ── QC Records ── */
 .qc-result-pass{background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;}
@@ -3976,13 +4002,13 @@ async function loadDependsOptions(currentTaskId){
 // PRODUCTION STAGE BOARD
 // ═══════════════════════════════════════════════════════════════
 const PROD_STAGES = [
-  { key:'raw_material',   label:'Raw Material',   color:'#94a3b8' },
-  { key:'procurement',    label:'Procurement',    color:'#6366f1' },
-  { key:'machining',      label:'Machining/CNC',  color:'#f97316' },
-  { key:'heat_treatment', label:'Heat/Surface',   color:'#ef4444' },
-  { key:'assembly',       label:'Assembly',       color:'#f59e0b' },
-  { key:'qc_inspection',  label:'QC/Inspection',  color:'#10b981' },
-  { key:'delivery',       label:'Delivery',       color:'#0891b2' },
+  { key:'raw_material',   label:'Raw Material',   icon:'🪨', color:'#94a3b8' },
+  { key:'procurement',    label:'Procurement',    icon:'🛒', color:'#6366f1' },
+  { key:'machining',      label:'Machining/CNC',  icon:'⚙️', color:'#f97316' },
+  { key:'heat_treatment', label:'Heat/Surface',   icon:'🔥', color:'#ef4444' },
+  { key:'assembly',       label:'Assembly',       icon:'🔩', color:'#f59e0b' },
+  { key:'qc_inspection',  label:'QC/Inspection',  icon:'🔬', color:'#10b981' },
+  { key:'delivery',       label:'Delivery',       icon:'🚚', color:'#0891b2' },
 ];
 
 let _prodAllTasks = [];
@@ -4072,15 +4098,18 @@ function _prodRender(tasks){
   const kpiEl=document.getElementById('prod-kpi-bar');
   if(kpiEl){
     kpiEl.innerHTML=[
-      {icon:'📦',label:'Total Tasks',val:total,color:'#2563eb',bg:'#eff6ff'},
-      {icon:'🚨',label:'Delayed >3d',val:delayed,color:'#dc2626',bg:'#fef2f2'},
-      {icon:'✅',label:'Done Today',val:completedToday,color:'#059669',bg:'#ecfdf5'},
-      {icon:'⚡',label:'High Priority',val:highPri,color:'#d97706',bg:'#fffbeb'},
-    ].map(k=>`<div style="background:${k.bg};border:1.5px solid ${k.color}33;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:22px;">${k.icon}</div>
-      <div><div style="font-size:24px;font-weight:900;color:${k.color};line-height:1;">${k.val}</div>
-      <div style="font-size:11px;color:${k.color};opacity:.75;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;">${k.label}</div>
-    </div></div>`).join('');
+      {icon:'📦',label:'Total Tasks',   val:total,          color:'#2563eb', bg:'#eff6ff'},
+      {icon:'🚨',label:'Delayed >3d',   val:delayed,        color:'#dc2626', bg:'#fef2f2'},
+      {icon:'✅',label:'Done Today',    val:completedToday, color:'#059669', bg:'#ecfdf5'},
+      {icon:'⚡',label:'High Priority', val:highPri,        color:'#d97706', bg:'#fffbeb'},
+    ].map(k=>`
+      <div class="prod-kpi-card">
+        <div class="prod-kpi-icon" style="background:${k.bg};">${k.icon}</div>
+        <div>
+          <div class="prod-kpi-val" style="color:${k.color};">${k.val}</div>
+          <div class="prod-kpi-label" style="color:${k.color};">${k.label}</div>
+        </div>
+      </div>`).join('');
   }
 
   const alertEl=document.getElementById('prod-bottleneck-alert');
@@ -4104,41 +4133,62 @@ function _prodRender(tasks){
     grouped[stage].push(t);
   });
 
-  const stagesShown=[{key:'backlog',label:'Backlog',color:'#64748b'},...PROD_STAGES];
+  const stagesShown=[{key:'backlog',label:'Backlog',icon:'📋',color:'#64748b'},...PROD_STAGES];
   let html='<div class="prod-board">';
   stagesShown.forEach(st=>{
     const cards=grouped[st.key]||[];
     const stageStuck=cards.filter(_prodIsBottleneck).length;
     html+=`<div class="prod-col" id="pcol-${st.key}">
-      <div class="prod-col-head" style="border-bottom-color:${st.color};">
-        <div class="prod-col-head-label">
-          <span class="prod-col-head-dot" style="background:${st.color};"></span>
-          <span style="color:${st.color};">${st.label}</span>
-          ${stageStuck>0?`<span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:800;">🚨${stageStuck}</span>`:''}
+      <div class="prod-col-head">
+        <div class="prod-col-head-bar" style="background:${st.color};opacity:.18;"></div>
+        <div class="prod-col-head-top">
+          <div class="prod-col-head-label">
+            <span class="prod-col-head-icon">${st.icon||'📌'}</span>
+            <span class="prod-col-head-name" style="color:${st.color};">${st.label}</span>
+            ${stageStuck>0?`<span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:800;">🚨${stageStuck}</span>`:''}
+          </div>
+          <span style="background:${st.color}20;color:${st.color};border-radius:20px;padding:2px 9px;font-size:11px;font-weight:800;min-width:22px;text-align:center;">${cards.length}</span>
         </div>
-        <span style="background:${st.color}22;color:${st.color};border-radius:12px;padding:2px 9px;font-size:11px;font-weight:800;">${cards.length}</span>
       </div>
       <div class="prod-col-body" id="pcbody-${st.key}"
         ondragover="event.preventDefault();this.classList.add('drag-over');"
         ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('drag-over');"
         ondrop="dropProdCard(event,'${st.key}')">`;
     if(!cards.length){
-      html+=`<div class="prod-card-empty">— ว่าง —</div>`;
+      html+=`<div class="prod-card-empty">
+        <div style="font-size:22px;margin-bottom:6px;opacity:.4;">📭</div>
+        ว่างอยู่
+      </div>`;
     } else {
       cards.forEach(t=>{
         const stuck=_prodIsBottleneck(t);
         const days=Math.floor(_prodDaysSince(t.updated_at));
-        const cardStyle=stuck?'border:2px solid #ef4444;box-shadow:0 0 0 3px #fca5a530;':'';
-        const stuckTag=stuck?`<div style="background:#fef2f2;border-bottom:1px solid #fca5a5;margin:-10px -12px 8px;padding:4px 10px;border-radius:8px 8px 0 0;font-size:11px;font-weight:700;color:#dc2626;">🚨 ค้างมา ${days} วัน</div>`:'';
-        html+=`<div class="prod-card" draggable="true" id="pcard-${t.id}" style="${cardStyle}"
+        const priColor={'high':'#ef4444','medium':'#f59e0b','low':'#22c55e'}[t.priority]||'#94a3b8';
+        const priLabel={'high':'🔴 High','medium':'🟡 Medium','low':'🟢 Low'}[t.priority]||'';
+        const daysColor = stuck ? '#dc2626' : days > 0 ? '#94a3b8' : '#22c55e';
+        const daysBg   = stuck ? '#fef2f2' : '#f8fafc';
+        html+=`<div class="prod-card" draggable="true" id="pcard-${t.id}"
+          style="${stuck?'border-color:#fca5a5;box-shadow:0 0 0 3px #fca5a520;':''}"
           ondragstart="this.classList.add('dragging');event.dataTransfer.setData('taskId','${t.id}');event.dataTransfer.setData('fromStage','${st.key}');"
           ondragend="document.querySelectorAll('.prod-card.dragging').forEach(c=>c.classList.remove('dragging'));"
           onclick="openTaskFromProd(${t.id})">
-          ${stuckTag}
-          <div class="prod-card-title">${t.name}</div>
-          <div class="prod-card-proj">${t._proj}</div>
-          ${t._assignee?`<div class="prod-card-assign"><span style="width:18px;height:18px;border-radius:50%;background:var(--primary);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;">${t._assignee[0].toUpperCase()}</span>${t._assignee}</div>`:''}
-          ${days>0?`<div style="font-size:10px;color:${stuck?'#dc2626':'var(--text-muted)'};margin-top:5px;">🕐 ${days} วันที่แล้ว</div>`:''}
+          ${stuck?`<div class="prod-card-stuck">🚨 ค้างมา ${days} วัน</div>`:''}
+          <div class="prod-card-priority-bar" style="background:${priColor};opacity:.7;"></div>
+          <div class="prod-card-body">
+            <div class="prod-card-title">${t.name}</div>
+            <div class="prod-card-proj">📁 ${t._proj||'—'}</div>
+            <div class="prod-card-footer">
+              ${t._assignee
+                ? `<div class="prod-card-assign">
+                    <span class="prod-card-assign-av" style="background:var(--primary);">${t._assignee[0].toUpperCase()}</span>
+                    ${t._assignee}
+                   </div>`
+                : `<div style="font-size:11px;color:#cbd5e1;">ยังไม่ได้มอบหมาย</div>`}
+              ${days>0
+                ? `<span class="prod-card-days" style="background:${daysBg};color:${daysColor};">🕐 ${days}ว</span>`
+                : `<span class="prod-card-days" style="background:#f0fdf4;color:#22c55e;">ใหม่</span>`}
+            </div>
+          </div>
         </div>`;
       });
     }
