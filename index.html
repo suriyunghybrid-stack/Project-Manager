@@ -85,10 +85,15 @@ function setupRealtime(){
       } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
         _rtSetBadge(false);
         if(_settings.realtimeEnabled&&currentUser){
-          // exponential backoff: 3s, 6s, 12s, ... max 60s
           const delay=Math.min(3000*Math.pow(2,_rtRetryCount),60000);
           _rtRetryCount++;
           clearTimeout(_rtRetryTimer);
+          // ถ้า error เกิน 5 ครั้ง → reload อัตโนมัติ
+          if(_rtRetryCount>=5){
+            console.log('[Realtime] Too many errors, reloading...');
+            setTimeout(()=>window.location.reload(),1000);
+            return;
+          }
           _rtRetryTimer=setTimeout(setupRealtime,delay);
         }
       }
@@ -105,6 +110,25 @@ function teardownRealtime(){
 function toggleRealtime(enable){
   if(enable)setupRealtime();else teardownRealtime();
 }
+
+// ── Auto-refresh เมื่อกลับมาเปิด Tab ──────────────────────────
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&currentUser){
+    // กลับมาเปิด Tab → เช็ค session และ refresh ข้อมูล
+    sb.auth.getSession().then(({data:{session}})=>{
+      if(!session){
+        // Session หมดอายุ → reload ให้ login ใหม่
+        window.location.reload();
+      } else {
+        // Session ยังอยู่ → refresh ข้อมูลปัจจุบัน
+        clearTimeout(_rtDebounce);
+        _rtDebounce=setTimeout(_rtRefreshCurrent,300);
+        // ถ้า Realtime ขาด → reconnect
+        if(!_rtChannel) setupRealtime();
+      }
+    });
+  }
+});
 
 // ══════════════════════════════════════════════
 //  NOTIFICATION CHECK (periodic)
