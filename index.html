@@ -1240,8 +1240,10 @@ select.form-input option{background:#fff;}
             style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);cursor:pointer;color:var(--text-muted);">✕ ล้าง</button>
         </div>
 
-        <div id="prod-board" style="overflow-x:auto;padding-bottom:12px;">
-          <div style="color:var(--text-muted);padding:24px;text-align:center;">⏳ กำลังโหลด...</div>
+        <div style="overflow-x:auto;padding-bottom:12px;">
+          <div id="prod-board">
+            <div style="color:var(--text-muted);padding:24px;text-align:center;">⏳ กำลังโหลด...</div>
+          </div>
         </div>
       </div>
 
@@ -2645,7 +2647,7 @@ function exportProjectsPrint(){
   <style>body{font-family:sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}th{background:#f1f3f9;font-weight:700;}tr:nth-child(even){background:#f9fafb;}
 /* ── Production Board ── */
 /* ════════════ PRODUCTION STAGE BOARD — REDESIGN ════════════ */
-.prod-board{display:flex;gap:14px;min-width:max-content;padding-bottom:20px;align-items:flex-start;}
+.prod-board{display:flex;flex-direction:row;gap:14px;min-width:max-content;padding-bottom:20px;align-items:flex-start;}
 
 /* Column */
 .prod-col{background:#f8fafc;border:1.5px solid var(--border);border-radius:16px;width:220px;flex-shrink:0;overflow:hidden;transition:box-shadow .2s;box-shadow:0 2px 8px rgba(0,0,0,.06);}
