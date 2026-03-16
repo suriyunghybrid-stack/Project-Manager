@@ -4136,7 +4136,7 @@ function _prodRender(tasks){
   });
 
   const stagesShown=[{key:'backlog',label:'Backlog',icon:'📋',color:'#64748b'},...PROD_STAGES];
-  let html='<div class="prod-board">';
+  let html='<div style="display:flex;flex-direction:row;gap:14px;min-width:max-content;padding-bottom:20px;align-items:flex-start;">';
   stagesShown.forEach(st=>{
     const cards=grouped[st.key]||[];
     const stageStuck=cards.filter(_prodIsBottleneck).length;
