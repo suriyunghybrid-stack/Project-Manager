@@ -1687,6 +1687,37 @@ async function doRegister(){
 
 async function doLogout(){await sb.auth.signOut();}
 
+// ── Auto-create Default Team on first login ──────────────────
+async function ensureDefaultTeam(user){
+  try{
+    // เช็คว่ามีทีมอยู่ในระบบแล้วไหม
+    const {data:teams} = await sb.from('teams').select('id').limit(1);
+    if(teams && teams.length > 0) return; // มีทีมแล้ว → ปล่อยให้ user เลือกเองในหน้า Team
+
+    // ยังไม่มีทีมเลยในระบบ → สร้าง "ทีมหลัก" ให้เป็นจุดเริ่มต้น
+    const userName = user.user_metadata?.name || user.email.split('@')[0];
+    const {data:newTeam} = await sb.from('teams').insert({
+      name: 'ทีมหลัก',
+      color: '#6366f1',
+      created_by: user.id
+    }).select().single();
+
+    if(newTeam){
+      currentTeamId = newTeam.id;
+      // เพิ่ม user แรกเป็น Leader อัตโนมัติ
+      await sb.from('team_members').insert({
+        name: userName,
+        role_title: 'Admin',
+        team_id: newTeam.id,
+        member_type: 'leader',
+        created_by: user.id
+      });
+    }
+  }catch(e){
+    console.warn('ensureDefaultTeam error:', e.message);
+  }
+}
+
 sb.auth.onAuthStateChange(async(event,session)=>{
   if(session?.user){
     currentUser=session.user;
@@ -1696,6 +1727,8 @@ sb.auth.onAuthStateChange(async(event,session)=>{
     document.getElementById('user-name').textContent=name;
     document.getElementById('user-email').textContent=session.user.email;
     document.getElementById('user-av').textContent=name[0].toUpperCase();
+    // สร้างทีม Default ถ้ายังไม่มี
+    await ensureDefaultTeam(session.user);
     loadDashboard();
     setupRealtime();
     setupNotifCheck();
