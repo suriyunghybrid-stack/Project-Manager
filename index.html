@@ -4140,55 +4140,54 @@ function _prodRender(tasks){
   stagesShown.forEach(st=>{
     const cards=grouped[st.key]||[];
     const stageStuck=cards.filter(_prodIsBottleneck).length;
-    html+=`<div class="prod-col" id="pcol-${st.key}">
-      <div class="prod-col-head">
-        <div class="prod-col-head-bar" style="background:${st.color};opacity:.18;"></div>
-        <div class="prod-col-head-top">
-          <div class="prod-col-head-label">
-            <span class="prod-col-head-icon">${st.icon||'📌'}</span>
-            <span class="prod-col-head-name" style="color:${st.color};">${st.label}</span>
+    html+=`<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:16px;width:220px;min-width:220px;flex-shrink:0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);" id="pcol-${st.key}">
+      <div style="background:#fff;border-radius:16px 16px 0 0;overflow:hidden;">
+        <div style="height:4px;width:100%;background:${st.color};opacity:.5;"></div>
+        <div style="padding:11px 14px 10px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:15px;">${st.icon||'📌'}</span>
+            <span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:${st.color};">${st.label}</span>
             ${stageStuck>0?`<span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:800;">🚨${stageStuck}</span>`:''}
           </div>
-          <span style="background:${st.color}20;color:${st.color};border-radius:20px;padding:2px 9px;font-size:11px;font-weight:800;min-width:22px;text-align:center;">${cards.length}</span>
+          <span style="background:${st.color}25;color:${st.color};border-radius:20px;padding:2px 9px;font-size:11px;font-weight:800;">${cards.length}</span>
         </div>
       </div>
-      <div class="prod-col-body" id="pcbody-${st.key}"
-        ondragover="event.preventDefault();this.classList.add('drag-over');"
-        ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('drag-over');"
-        ondrop="dropProdCard(event,'${st.key}')">`;
+      <div style="padding:10px;min-height:160px;display:flex;flex-direction:column;gap:8px;" id="pcbody-${st.key}"
+        ondragover="event.preventDefault();this.style.background='#eef2ff';this.style.outline='2.5px dashed #6366f1';"
+        ondragleave="this.style.background='';this.style.outline='';"
+        ondrop="this.style.background='';this.style.outline='';dropProdCard(event,'${st.key}')">`;
     if(!cards.length){
-      html+=`<div class="prod-card-empty">
-        <div style="font-size:22px;margin-bottom:6px;opacity:.4;">📭</div>
-        ว่างอยู่
+      html+=`<div style="color:#94a3b8;font-size:11px;text-align:center;padding:20px 8px;border:1.5px dashed #e2e8f0;border-radius:10px;background:#fafbfc;line-height:1.8;">
+        <div style="font-size:20px;margin-bottom:4px;opacity:.4;">📭</div>ว่างอยู่
       </div>`;
     } else {
       cards.forEach(t=>{
         const stuck=_prodIsBottleneck(t);
         const days=Math.floor(_prodDaysSince(t.updated_at));
         const priColor={'high':'#ef4444','medium':'#f59e0b','low':'#22c55e'}[t.priority]||'#94a3b8';
-        const priLabel={'high':'🔴 High','medium':'🟡 Medium','low':'🟢 Low'}[t.priority]||'';
         const daysColor = stuck ? '#dc2626' : days > 0 ? '#94a3b8' : '#22c55e';
-        const daysBg   = stuck ? '#fef2f2' : '#f8fafc';
-        html+=`<div class="prod-card" draggable="true" id="pcard-${t.id}"
-          style="${stuck?'border-color:#fca5a5;box-shadow:0 0 0 3px #fca5a520;':''}"
-          ondragstart="this.classList.add('dragging');event.dataTransfer.setData('taskId','${t.id}');event.dataTransfer.setData('fromStage','${st.key}');"
-          ondragend="document.querySelectorAll('.prod-card.dragging').forEach(c=>c.classList.remove('dragging'));"
-          onclick="openTaskFromProd(${t.id})">
-          ${stuck?`<div class="prod-card-stuck">🚨 ค้างมา ${days} วัน</div>`:''}
-          <div class="prod-card-priority-bar" style="background:${priColor};opacity:.7;"></div>
-          <div class="prod-card-body">
-            <div class="prod-card-title">${t.name}</div>
-            <div class="prod-card-proj">📁 ${t._proj||'—'}</div>
-            <div class="prod-card-footer">
+        const daysBg   = stuck ? '#fef2f2' : days > 0 ? '#f8fafc' : '#f0fdf4';
+        const cardBorder = stuck ? 'border-color:#fca5a5;box-shadow:0 0 0 3px #fca5a520;' : 'border-color:#e8edf3;';
+        html+=`<div style="background:#fff;${cardBorder}border:1.5px solid;border-radius:12px;padding:0;font-size:13px;cursor:grab;overflow:hidden;user-select:none;"
+          draggable="true" id="pcard-${t.id}"
+          ondragstart="this.style.opacity='.3';event.dataTransfer.setData('taskId','${t.id}');event.dataTransfer.setData('fromStage','${st.key}');"
+          ondragend="this.style.opacity='1';"
+          onclick="openTaskFromProd(${t.id})"
+          onmouseover="this.style.boxShadow='0 6px 18px rgba(0,0,0,.11)';this.style.transform='translateY(-2px)';"
+          onmouseout="this.style.boxShadow='';this.style.transform='';">
+          ${stuck?`<div style="background:#fef2f2;border-bottom:1px solid #fca5a5;padding:5px 12px;font-size:11px;font-weight:700;color:#dc2626;">🚨 ค้างมา ${days} วัน</div>`:''}
+          <div style="height:3px;width:100%;background:${priColor};opacity:.75;"></div>
+          <div style="padding:10px 12px 11px;">
+            <div style="font-weight:700;margin-bottom:5px;line-height:1.45;color:#1e293b;font-size:12.5px;">${t.name}</div>
+            <div style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📁 ${t._proj||'—'}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:7px;border-top:1px solid #f1f5f9;">
               ${t._assignee
-                ? `<div class="prod-card-assign">
-                    <span class="prod-card-assign-av" style="background:var(--primary);">${t._assignee[0].toUpperCase()}</span>
+                ? `<div style="font-size:11px;color:#6366f1;font-weight:600;display:flex;align-items:center;gap:5px;">
+                    <span style="width:20px;height:20px;border-radius:50%;background:#6366f1;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;">${t._assignee[0].toUpperCase()}</span>
                     ${t._assignee}
                    </div>`
-                : `<div style="font-size:11px;color:#cbd5e1;">ยังไม่ได้มอบหมาย</div>`}
-              ${days>0
-                ? `<span class="prod-card-days" style="background:${daysBg};color:${daysColor};">🕐 ${days}ว</span>`
-                : `<span class="prod-card-days" style="background:#f0fdf4;color:#22c55e;">ใหม่</span>`}
+                : `<div style="font-size:11px;color:#cbd5e1;">—</div>`}
+              <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:${daysBg};color:${daysColor};">${days>0?`🕐 ${days}ว`:'ใหม่'}</span>
             </div>
           </div>
         </div>`;
