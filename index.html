@@ -4382,6 +4382,7 @@ const PROJECT_TEMPLATES = [
     name:'Jig & Fixture Standard',
     desc:'12 ขั้นตอนครบ: RFQ → Design → Mfg → QC → Delivery',
     badge:'Recommended',
+    category:'jig',
     tasks:[
       {name:'รับ RFQ + วิเคราะห์ความเป็นไปได้',  status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog', days:[0,2]},
       {name:'ส่ง Quotation + รอ PO',              status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog', days:[2,5]},
@@ -4404,6 +4405,7 @@ const PROJECT_TEMPLATES = [
     name:'Quick Jig (Simple)',
     desc:'สำหรับ Jig เล็ก ใช้เวลาสั้น (4-6 สัปดาห์)',
     badge:'',
+    category:'jig',
     tasks:[
       {name:'รับ RFQ + เสนอราคา',                 status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[0,3]},
       {name:'ออกแบบ 3D + 2D Drawing',             status:'todo', priority:'high',   tag:'design', production_stage:'backlog',   days:[3,10]},
@@ -4418,6 +4420,7 @@ const PROJECT_TEMPLATES = [
     name:'Welding Fixture (Automotive)',
     desc:'Fixture สำหรับงาน Welding ชิ้นส่วนรถยนต์',
     badge:'',
+    category:'jig',
     tasks:[
       {name:'รับ Part Drawing + วิเคราะห์',        status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[0,3]},
       {name:'PFMEA + DFM Review',                  status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[3,7]},
@@ -4437,6 +4440,7 @@ const PROJECT_TEMPLATES = [
     name:'Checking Gauge / Inspection Jig',
     desc:'สำหรับ Gauge / Inspection fixture วัดชิ้นงาน',
     badge:'',
+    category:'jig',
     tasks:[
       {name:'รับ Gauge Design Spec + RFQ',         status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[0,2]},
       {name:'3D CAD Design (Gauge)',                status:'todo', priority:'high',   tag:'design', production_stage:'backlog',   days:[2,10]},
@@ -4449,18 +4453,107 @@ const PROJECT_TEMPLATES = [
       {name:'Delivery + Calibration Certificate',  status:'todo', priority:'high',   tag:'docs',   production_stage:'delivery',  days:[42,44]},
     ]
   },
+  // ═══════════════════ AUTOMATION TEMPLATES ═══════════════════
+  {
+    id:'auto_robot',
+    name:'🤖 Robotic Cell / Robot Integration',
+    desc:'ระบบ Robot: Pick & Place, Welding, Assembly (8-14 สัปดาห์)',
+    badge:'Automation',
+    category:'automation',
+    tasks:[
+      {name:'รับ RFQ + วิเคราะห์ Spec & Cycle Time',       status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[0,3]},
+      {name:'Quotation + Robot Selection (Brand/Model)',    status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[3,7]},
+      {name:'Project Kickoff + Safety Risk Assessment',     status:'todo', priority:'high',   tag:'feature',production_stage:'backlog',       days:[7,9]},
+      {name:'System Layout + Robot Reach Study',            status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[9,18]},
+      {name:'Electrical & Pneumatic Diagram',               status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[14,22]},
+      {name:'Safety Zone & Light Curtain Design (ISO 13849)',status:'todo',priority:'high',   tag:'design', production_stage:'backlog',       days:[18,24]},
+      {name:'BOM + Procurement (Robot, Controller, Tools)', status:'todo', priority:'medium', tag:'feature',production_stage:'procurement',   days:[22,30]},
+      {name:'Panel Build + Wiring',                         status:'todo', priority:'medium', tag:'feature',production_stage:'machining',     days:[30,42]},
+      {name:'Robot Program + End Effector Setup',           status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[38,52]},
+      {name:'HMI / PLC Program (Safety Logic)',             status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[44,54]},
+      {name:'FAT — Factory Acceptance Test',                status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[54,58]},
+      {name:'Site Installation + Commissioning',            status:'todo', priority:'high',   tag:'feature',production_stage:'delivery',      days:[58,64]},
+      {name:'SAT — Site Acceptance Test + Customer Sign',   status:'todo', priority:'high',   tag:'test',   production_stage:'delivery',      days:[64,68]},
+      {name:'Training + Manual + Handover',                 status:'todo', priority:'medium', tag:'docs',   production_stage:'delivery',      days:[68,72]},
+    ]
+  },
+  {
+    id:'auto_conveyor',
+    name:'🏭 Conveyor / Material Handling System',
+    desc:'ระบบสายพาน ลำเลียงวัสดุอัตโนมัติ (6-10 สัปดาห์)',
+    badge:'Automation',
+    category:'automation',
+    tasks:[
+      {name:'รับ RFQ + วิเคราะห์ Layout & Load Capacity',  status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[0,3]},
+      {name:'Quotation + Motor/Drive Selection',            status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[3,6]},
+      {name:'Mechanical Design (Frame, Belt, Roller)',      status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[6,16]},
+      {name:'Electrical Diagram + VFD/Sensor Spec',         status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[12,20]},
+      {name:'BOM + Procurement (Motor, Belt, Sensor)',      status:'todo', priority:'medium', tag:'feature',production_stage:'procurement',   days:[18,25]},
+      {name:'Fabrication + Machining (Frame)',              status:'todo', priority:'medium', tag:'feature',production_stage:'machining',     days:[24,36]},
+      {name:'Panel Build + Wiring + Sensor Install',        status:'todo', priority:'medium', tag:'feature',production_stage:'assembly',      days:[34,44]},
+      {name:'PLC Program (Speed Control, Safety Stop)',     status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[40,48]},
+      {name:'FAT — Run Test + Load Test',                   status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[48,52]},
+      {name:'Site Installation + Alignment',                status:'todo', priority:'high',   tag:'feature',production_stage:'delivery',      days:[52,57]},
+      {name:'SAT + Customer Approval + Handover',           status:'todo', priority:'high',   tag:'docs',   production_stage:'delivery',      days:[57,62]},
+    ]
+  },
+  {
+    id:'auto_plc',
+    name:'⚡ PLC / Machine Control System',
+    desc:'ระบบควบคุมเครื่องจักร PLC, HMI, SCADA (5-8 สัปดาห์)',
+    badge:'Automation',
+    category:'automation',
+    tasks:[
+      {name:'รับ RFQ + วิเคราะห์ I/O List & Control Logic', status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[0,3]},
+      {name:'Quotation + PLC/HMI Brand Selection',           status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[3,6]},
+      {name:'System Architecture + I/O Diagram',             status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[6,12]},
+      {name:'Electrical Panel Design + Wiring Diagram',      status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[10,18]},
+      {name:'BOM + Procurement (PLC, HMI, Sensors, VFD)',   status:'todo', priority:'medium', tag:'feature',production_stage:'procurement',   days:[15,22]},
+      {name:'Panel Build + Wiring + Cable Labeling',         status:'todo', priority:'medium', tag:'feature',production_stage:'machining',     days:[20,30]},
+      {name:'PLC Programming (Ladder / FBD)',                status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[25,36]},
+      {name:'HMI Screen Design + Alarm Setup',               status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[30,38]},
+      {name:'Bench Test + I/O Verification',                 status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[36,40]},
+      {name:'FAT — Full Function Test + Customer Witness',   status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[40,44]},
+      {name:'Site Installation + Commissioning',             status:'todo', priority:'high',   tag:'feature',production_stage:'delivery',      days:[44,50]},
+      {name:'SAT + Training + Manual Handover',              status:'todo', priority:'high',   tag:'docs',   production_stage:'delivery',      days:[50,54]},
+    ]
+  },
 ];
 
 function openTemplateModal(){
-  const list=document.getElementById('template-list');
-  list.innerHTML=PROJECT_TEMPLATES.map(t=>`
-    <div class="tmpl-card" id="tmpl-${t.id}" onclick="selectTemplate('${t.id}')">
-      ${t.badge?`<div class="tmpl-badge">${t.badge}</div>`:''}
-      <div class="tmpl-card-title">${t.name}</div>
-      <div class="tmpl-card-desc">${t.desc}</div>
-      <div style="font-size:10px;color:var(--primary);margin-top:6px;font-weight:600;">${t.tasks.length} Tasks</div>
+  const jigTemplates  = PROJECT_TEMPLATES.filter(t => t.category === 'jig');
+  const autoTemplates = PROJECT_TEMPLATES.filter(t => t.category === 'automation');
+
+  function renderCards(templates){
+    return templates.map(t=>`
+      <div class="tmpl-card" id="tmpl-${t.id}" onclick="selectTemplate('${t.id}')">
+        ${t.badge ? `<div class="tmpl-badge" style="${t.category==='automation'?'background:#f59e0b;color:#fff;':''}">${t.badge}</div>` : ''}
+        <div class="tmpl-card-title">${t.name}</div>
+        <div class="tmpl-card-desc">${t.desc}</div>
+        <div style="font-size:10px;color:var(--primary);margin-top:6px;font-weight:600;">${t.tasks.length} Tasks</div>
+      </div>
+    `).join('');
+  }
+
+  const list = document.getElementById('template-list');
+  list.innerHTML = `
+    <div style="margin-bottom:18px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+                  color:#6366f1;background:#eef2ff;border-left:3px solid #6366f1;
+                  padding:6px 12px;border-radius:6px;margin-bottom:10px;">
+        🔧 Jig &amp; Fixture
+      </div>
+      <div class="template-grid">${renderCards(jigTemplates)}</div>
     </div>
-  `).join('');
+    <div>
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+                  color:#f59e0b;background:#fffbeb;border-left:3px solid #f59e0b;
+                  padding:6px 12px;border-radius:6px;margin-bottom:10px;">
+        🤖 Automation
+      </div>
+      <div class="template-grid">${renderCards(autoTemplates)}</div>
+    </div>
+  `;
   document.getElementById('template-config').style.display='none';
   document.getElementById('tmpl-create-btn').style.display='none';
   document.getElementById('tmpl-proj-name').value='';
