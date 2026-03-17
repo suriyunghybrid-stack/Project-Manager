@@ -89,13 +89,14 @@ function setupRealtime(){
           const delay=Math.min(3000*Math.pow(2,_rtRetryCount),60000);
           _rtRetryCount++;
           clearTimeout(_rtRetryTimer);
-          // ถ้า error เกิน 5 ครั้ง → reload อัตโนมัติ
-          if(_rtRetryCount>=5){
-            console.log('[Realtime] Too many errors, reloading...');
-            setTimeout(()=>window.location.reload(),1000);
-            return;
+          // โหลดข้อมูลปัจจุบันทันที แม้ Realtime จะขาด
+          _rtRefreshCurrent();
+          // retry reconnect (ไม่ reload หน้า — ป้องกันวนซ้ำ)
+          if(_rtRetryCount<10){
+            _rtRetryTimer=setTimeout(setupRealtime,delay);
+          } else {
+            console.log('[Realtime] Giving up reconnect, data still loads normally.');
           }
-          _rtRetryTimer=setTimeout(setupRealtime,delay);
         }
       }
     });
@@ -115,16 +116,18 @@ function toggleRealtime(enable){
 // ── Auto-refresh เมื่อกลับมาเปิด Tab ──────────────────────────
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&currentUser){
-    // กลับมาเปิด Tab → เช็ค session และ refresh ข้อมูล
+    // โหลดข้อมูลทันทีก่อนเสมอ ไม่รอ session check
+    clearTimeout(_rtDebounce);
+    _rtDebounce=setTimeout(_rtRefreshCurrent,300);
+    // เช็ค session แบบ background
     sb.auth.getSession().then(({data:{session}})=>{
       if(!session){
-        // Session หมดอายุ → reload ให้ login ใหม่
-        window.location.reload();
+        // Session หมดอายุ → redirect ไป login (ไม่ reload)
+        currentUser=null;
+        document.getElementById('app').style.display='none';
+        document.getElementById('login-screen').style.display='flex';
       } else {
-        // Session ยังอยู่ → refresh ข้อมูลปัจจุบัน
-        clearTimeout(_rtDebounce);
-        _rtDebounce=setTimeout(_rtRefreshCurrent,300);
-        // ถ้า Realtime ขาด → reconnect
+        // ถ้า Realtime ขาด → reconnect แบบ background
         if(!_rtChannel) setupRealtime();
       }
     });
@@ -2059,6 +2062,22 @@ function showDashboardReport() {
   </div>
 </div>
 
+
+// ══════════════════════════════════════════════
+//  KEEP-ALIVE: ป้องกัน Vercel Cold Start + โหลดข้อมูลทุก 4 นาที
+// ══════════════════════════════════════════════
+let _keepAliveId=null;
+function setupKeepAlive(){
+  clearInterval(_keepAliveId);
+  _keepAliveId=setInterval(async()=>{
+    if(!currentUser)return;
+    // ping Supabase เบาๆ เพื่อไม่ให้ connection หลับ
+    try{await sb.from("profiles").select("id").limit(1);}catch(e){}
+    // โหลดข้อมูลหน้าปัจจุบันใหม่ถ้า Realtime ขาด
+    if(!_rtChannel||_rtRetryCount>0){_rtRefreshCurrent();}
+  },4*60*1000);
+  console.log("[KeepAlive] started — ping every 4 min");
+}
 <script>
 // ══════════════════════════════════════════════
 //  SUPABASE INIT
@@ -2171,6 +2190,7 @@ sb.auth.onAuthStateChange(async(event,session)=>{
     setupRealtime();
     setupNotifCheck();
     loadSettings();
+    setupKeepAlive();
   }else{
     currentUser=null;
     teardownRealtime();
