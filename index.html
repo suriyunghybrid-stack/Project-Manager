@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProjectPro — Online</title>
@@ -304,6 +305,46 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);mi
 .auth-msg{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
 .auth-error{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;}
 .auth-success{background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a;}
+/* UX/UI Effects for Professional App */
+.dashboard-card, .kanban-task, .kanban-title {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.dashboard-card:hover, .kanban-task:hover {
+  box-shadow: 0 4px 16px rgba(99,102,241,0.15);
+  transform: translateY(-2px) scale(1.04);
+  background: #eef2ff;
+}
+.dashboard-card:hover i, .kanban-title:hover i {
+  color: #8b5cf6;
+}
+.kanban-title {
+  position: relative;
+}
+.kanban-title[data-tooltip]:hover:after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: 120%;
+  transform: translateX(-50%);
+  background: #6366f1;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.15);
+  z-index: 10;
+}
+/* Ripple effect on click */
+.dashboard-card:active, .kanban-task:active {
+  animation: ripple 0.3s;
+}
+@keyframes ripple {
+  0% { box-shadow: 0 0 0 0 #6366f1; }
+  50% { box-shadow: 0 0 0 8px #6366f1; }
+  100% { box-shadow: 0 0 0 0 #6366f1; }
+}
 
 /* LAYOUT */
 #app{display:none;}
@@ -801,6 +842,379 @@ select.form-input option{background:#fff;}
 </style>
 </head>
 <body>
+<!-- SCALABLE UI/UX & SYSTEM DESIGN (for large data) -->
+<!-- 1. Pagination Example -->
+<div class="pagination-bar" style="margin:16px 0;display:flex;gap:8px;">
+  <button class="btn btn-sm" onclick="prevPage()">Prev</button>
+  <span id="page-info">Page 1/10</span>
+  <button class="btn btn-sm" onclick="nextPage()">Next</button>
+</div>
+
+<!-- 2. Lazy Load Example (JS) -->
+<script>
+let currentPage = 1;
+function prevPage() { if(currentPage>1){ currentPage--; loadPage(currentPage); } }
+function nextPage() { currentPage++; loadPage(currentPage); }
+function loadPage(page) {
+  // ดึงข้อมูลเฉพาะหน้าจาก backend (API)
+  // fetch(`/api/tasks?page=${page}&limit=50`).then(...)
+  document.getElementById('page-info').textContent = `Page ${page}/10`;
+}
+</script>
+
+<!-- 3. Filter/Group Example -->
+<div class="filter-bar">
+  <select id="filter-group">
+    <option value="">Group by</option>
+    <option value="status">Status</option>
+    <option value="machine">Machine</option>
+    <option value="phase">Phase</option>
+    <option value="part">Part</option>
+  </select>
+</div>
+
+<!-- 4. Responsive UI Example -->
+<style>
+@media (max-width: 600px) {
+  .dashboard-summary, .kanban-board, .pagination-bar { flex-direction: column; }
+  .dashboard-card, .kanban-column { min-width: 100%; }
+}
+</style>
+
+<!-- 5. Security/Role Example (JS) -->
+<script>
+function showSensitiveData() {
+  if(currentUser && (currentUser.role==='manager'||currentUser.role==='admin')) {
+    // แสดงข้อมูลสำคัญ เช่น cost, defect, audit log
+  } else {
+    // ซ่อนข้อมูลสำคัญ
+  }
+}
+</script>
+
+<!-- 6. Cloud Storage Example (comment) -->
+<!-- ไฟล์ DWG/PDF ควรเก็บใน cloud storage เช่น Supabase Storage, S3 -->
+
+<!-- 7. Audit Log Example (comment) -->
+<!-- ทุกการเปลี่ยนแปลงควรบันทึก audit log -->
+
+<!-- ...existing code... -->
+<!-- DASHBOARD SUMMARY -->
+<div class="dashboard-summary">
+  <div class="dashboard-card"><div><i class="fa-solid fa-cubes fa-2x" style="color:#6366f1"></i></div><div id="dash-project-count">0</div><div>Projects</div></div>
+  <div class="dashboard-card"><div><i class="fa-solid fa-list-check fa-2x" style="color:#22c55e"></i></div><div id="dash-task-count">0</div><div>Tasks</div></div>
+  <div class="dashboard-card"><div><i class="fa-solid fa-triangle-exclamation fa-2x" style="color:#ef4444"></i></div><div id="dash-bottleneck-count">0</div><div>Bottleneck</div></div>
+  <div class="dashboard-card"><div><i class="fa-solid fa-user-gear fa-2x" style="color:#f59e0b"></i></div><div id="dash-member-count">0</div><div>Team</div></div>
+  <div class="dashboard-card"><div><i class="fa-solid fa-robot fa-2x" style="color:#06b6d4"></i></div><div id="dash-part-count">0</div><div>Parts</div></div>
+  <div class="dashboard-card"><div><i class="fa-solid fa-stopwatch fa-2x" style="color:#6366f1"></i></div><div id="dash-duration">0</div><div>Duration</div></div>
+  <div class="dashboard-card"><div><i class="fa-solid fa-coins fa-2x" style="color:#22c55e"></i></div><div id="dash-cost">0</div><div>Cost</div></div>
+  <div class="dashboard-card"><div><i class="fa-solid fa-xmark fa-2x" style="color:#ef4444"></i></div><div id="dash-defect">0</div><div>Defect</div></div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <input type="text" placeholder="ค้นหางานหรือ Part..." id="filter-search" style="flex:1;">
+  <select id="filter-type">
+    <option value="">ประเภทงาน</option>
+    <option value="JIG">JIG</option>
+    <option value="CF">CF</option>
+    <option value="FIXTURE">FIXTURE</option>
+    <option value="AUTOMATION">AUTOMATION</option>
+  </select>
+  <select id="filter-phase">
+    <option value="">ขั้นตอน</option>
+    <option value="RFQ">RFQ/Inquiry</option>
+    <option value="Quotation">Quotation & PO</option>
+    <option value="Kickoff">Project Kickoff</option>
+    <option value="APQP">APQP/PFMEA</option>
+    <option value="3D CAD">3D CAD Design</option>
+    <option value="2D DWG">2D Drawing + BOM</option>
+    <option value="Procurement">Procurement</option>
+    <option value="Machining">Machining/Fab</option>
+    <option value="Heat Treat">Heat/Surface Treat</option>
+    <option value="Assembly">Assembly & Fitting</option>
+    <option value="CMM">CMM/FAI</option>
+    <option value="Faro Arm">Faro Arm</option>
+    <option value="Delivery">Delivery & PPAP</option>
+  </select>
+  <select id="filter-machine">
+    <option value="">เครื่อง/Process</option>
+    <option value="CNC">CNC</option>
+    <option value="Lathe">Lathe</option>
+    <option value="Milling">Milling</option>
+    <option value="Assembly">Assembly</option>
+    <option value="QC">QC</option>
+    <!-- ... เพิ่มเติม ... -->
+  </select>
+  <button class="export-btn">Export</button>
+</div>
+
+<!-- NOTIFICATION BAR -->
+<div class="notification-bar" id="notification-bar" style="display:none;">แจ้งเตือนงาน bottleneck, overdue, defect สูง, เอกสารไม่ครบ</div>
+
+<!-- KANBAN BOARD (มาตรฐาน) -->
+<div class="kanban-board">
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-file-invoice"></i> RFQ/Inquiry</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-file-signature"></i> Quotation & PO</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-rocket"></i> Project Kickoff</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-clipboard-list"></i> APQP/PFMEA</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-cube"></i> 3D CAD Design</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-ruler-combined"></i> 2D Drawing + BOM</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-cart-shopping"></i> Procurement</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-cogs"></i> Machining/Fab</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-fire"></i> Heat/Surface Treat</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-screwdriver-wrench"></i> Assembly & Fitting</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-magnifying-glass"></i> CMM/FAI</div></div>
+  <div class="kanban-column"><div class="kanban-title"><i class="fa-solid fa-truck"></i> Delivery & PPAP</div></div>
+</div>
+
+<!-- PRODUCTION STAGE BOARD (Dynamic/Part) -->
+<div class="kanban-board" style="margin-top:24px;">
+  <div class="kanban-column"><div class="kanban-title">Part Custom Stage</div>
+    <div class="kanban-task">Part-001<br>ขั้นตอน: Machining<br>เครื่อง: CNC<br>เริ่ม: 2026-03-01<br>จบ: 2026-03-02<br>Estimated: 8h<br>Actual: 5h<br>Defect: 0<br>DWG: <a href="#">Drawing1.dwg</a></div>
+    <div class="kanban-task">Part-002<br>ขั้นตอน: Assembly<br>เครื่อง: Assembly<br>เริ่ม: 2026-03-03<br>จบ: 2026-03-04<br>Estimated: 8h<br>Actual: 14h<br>Defect: 2<br>DWG: <a href="#">Drawing2.dwg</a></div>
+    <!-- ... เพิ่มเติมตาม workflow เฉพาะของแต่ละ Part ... -->
+  </div>
+</div>
+
+<!-- TASK/PART DETAIL -->
+<div class="task-detail">
+  <h3>JIG-001 : Assembly & Fitting</h3>
+  <div>ประเภท: JIG</div>
+  <div>ขั้นตอน: Assembly & Fitting</div>
+  <div>เครื่อง: Assembly</div>
+  <div>ผู้รับผิดชอบ: สมชาย</div>
+  <div>วันที่เริ่ม: 2026-03-01</div>
+  <div>วันที่สิ้นสุด: 2026-03-20</div>
+  <div>Estimated: 8h</div>
+  <div>Actual: 10h</div>
+  <div>Estimated Cost: 100 บาท</div>
+  <div>Actual Cost: 120 บาท</div>
+  <div>Bottleneck: <span style="color:#ef4444">❌</span></div>
+  <div>Defect: 1</div>
+  <div>เอกสาร: <a href="#">Drawing.pdf</a>, <a href="#">QC Cert</a></div>
+  <div>Comment: งานติดขัดที่ Assembly</div>
+  <div>Part List: <ul><li>Part-001 (Machining, CNC, 5h, Defect: 0, DWG: <a href="#">Drawing1.dwg</a>)</li><li>Part-002 (Assembly, 14h, Defect: 2, DWG: <a href="#">Drawing2.dwg</a>)</li></ul></div>
+</div>
+
+<!-- AUDIT LOG -->
+<div class="card" style="margin-bottom:24px;">
+  <h4>Audit Log</h4>
+  <ul>
+    <li>2026-03-01: สร้างงาน JIG-001</li>
+    <li>2026-03-05: เปลี่ยนขั้นตอนเป็น Assembly</li>
+    <li>2026-03-10: แนบเอกสาร QC Cert</li>
+    <li>2026-03-15: แจ้ง bottleneck</li>
+    <li>2026-03-20: ฝ่ายผลิตสแกนบาร์โค้ดจบงาน</li>
+  </ul>
+</div>
+
+<!-- ROLE-BASED DASHBOARD/REPORT -->
+<script>
+// ตัวอย่าง role-based dashboard/report
+function showDashboardReport() {
+  if(currentUser && (currentUser.role==='manager'||currentUser.role==='md'||currentUser.role==='admin')) {
+    document.getElementById('dashboard-summary').style.display='block';
+    // ...แสดงข้อมูลเปรียบเทียบ estimated vs actual, defect, performance...
+  } else {
+    document.getElementById('dashboard-summary').style.display='none';
+  }
+}
+</script>
+
+<!-- ...existing code... -->
+<!-- DASHBOARD SUMMARY -->
+<div class="dashboard-summary">
+  <div class="dashboard-card"><div>📁</div><div id="dash-project-count">0</div><div>Projects</div></div>
+  <div class="dashboard-card"><div>✅</div><div id="dash-task-count">0</div><div>Tasks</div></div>
+  <div class="dashboard-card"><div>⚠️</div><div id="dash-bottleneck-count">0</div><div>Bottleneck</div></div>
+  <div class="dashboard-card"><div>👥</div><div id="dash-member-count">0</div><div>Team</div></div>
+  <div class="dashboard-card"><div>🧩</div><div id="dash-part-count">0</div><div>Parts</div></div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <input type="text" placeholder="ค้นหางานหรือ Part..." id="filter-search" style="flex:1;">
+  <select id="filter-type">
+    <option value="">ประเภทงาน</option>
+    <option value="JIG">JIG</option>
+    <option value="CF">CF</option>
+    <option value="FIXTURE">FIXTURE</option>
+    <option value="AUTOMATION">AUTOMATION</option>
+  </select>
+  <select id="filter-phase">
+    <option value="">ขั้นตอน</option>
+    <option value="RFQ">RFQ/Inquiry</option>
+    <option value="Quotation">Quotation & PO</option>
+    <option value="Kickoff">Project Kickoff</option>
+    <option value="APQP">APQP/PFMEA</option>
+    <option value="3D CAD">3D CAD Design</option>
+    <option value="2D DWG">2D Drawing + BOM</option>
+    <option value="Procurement">Procurement</option>
+    <option value="Machining">Machining/Fab</option>
+    <option value="Heat Treat">Heat/Surface Treat</option>
+    <option value="Assembly">Assembly & Fitting</option>
+    <option value="CMM">CMM/FAI</option>
+    <option value="Delivery">Delivery & PPAP</option>
+  </select>
+  <button class="export-btn">Export</button>
+</div>
+
+<!-- NOTIFICATION BAR -->
+<div class="notification-bar" id="notification-bar" style="display:none;">แจ้งเตือนงาน bottleneck, overdue, เอกสารไม่ครบ</div>
+
+<!-- KANBAN BOARD (มาตรฐาน) -->
+<div class="kanban-board">
+  <div class="kanban-column"><div class="kanban-title">RFQ/Inquiry</div></div>
+  <div class="kanban-column"><div class="kanban-title">Quotation & PO</div></div>
+  <div class="kanban-column"><div class="kanban-title">Project Kickoff</div></div>
+  <div class="kanban-column"><div class="kanban-title">APQP/PFMEA</div></div>
+  <div class="kanban-column"><div class="kanban-title">3D CAD Design</div></div>
+  <div class="kanban-column"><div class="kanban-title">2D Drawing + BOM</div></div>
+  <div class="kanban-column"><div class="kanban-title">Procurement</div></div>
+  <div class="kanban-column"><div class="kanban-title">Machining/Fab</div></div>
+  <div class="kanban-column"><div class="kanban-title">Heat/Surface Treat</div></div>
+  <div class="kanban-column"><div class="kanban-title">Assembly & Fitting</div></div>
+  <div class="kanban-column"><div class="kanban-title">CMM/FAI</div></div>
+  <div class="kanban-column"><div class="kanban-title">Delivery & PPAP</div></div>
+</div>
+
+<!-- PRODUCTION STAGE BOARD (Dynamic/Part) -->
+<div class="kanban-board" style="margin-top:24px;">
+  <div class="kanban-column"><div class="kanban-title">Part Custom Stage</div>
+    <div class="kanban-task">Part-001<br>ขั้นตอน: Machining</div>
+    <div class="kanban-task">Part-002<br>ขั้นตอน: Assembly</div>
+    <div class="kanban-task">Part-003<br>ขั้นตอน: QC</div>
+    <!-- ... เพิ่มเติมตาม workflow เฉพาะของแต่ละ Part ... -->
+  </div>
+</div>
+
+<!-- TASK/PART DETAIL -->
+<div class="task-detail">
+  <h3>JIG-001 : Assembly & Fitting</h3>
+  <div>ประเภท: JIG</div>
+  <div>ขั้นตอน: Assembly & Fitting</div>
+  <div>ผู้รับผิดชอบ: สมชาย</div>
+  <div>วันที่เริ่ม: 2026-03-01</div>
+  <div>วันที่สิ้นสุด: 2026-03-20</div>
+  <div>Bottleneck: <span style="color:#ef4444">❌</span></div>
+  <div>เอกสาร: <a href="#">Drawing.pdf</a>, <a href="#">QC Cert</a></div>
+  <div>Comment: งานติดขัดที่ Assembly</div>
+  <div>Part List: <ul><li>Part-001 (Machining)</li><li>Part-002 (Assembly)</li></ul></div>
+</div>
+
+<!-- AUDIT LOG -->
+<div class="card" style="margin-bottom:24px;">
+  <h4>Audit Log</h4>
+  <ul>
+    <li>2026-03-01: สร้างงาน JIG-001</li>
+    <li>2026-03-05: เปลี่ยนขั้นตอนเป็น Assembly</li>
+    <li>2026-03-10: แนบเอกสาร QC Cert</li>
+    <li>2026-03-15: แจ้ง bottleneck</li>
+  </ul>
+</div>
+
+<!-- ...existing code... -->
+<!-- UI/Logic Standard Components -->
+<!-- Dashboard Summary -->
+<div class="dashboard-summary">
+  <div class="dashboard-card">
+    <div>📁</div>
+    <div id="dash-project-count">0</div>
+    <div>Projects</div>
+  </div>
+  <div class="dashboard-card">
+    <div>✅</div>
+    <div id="dash-task-count">0</div>
+    <div>Tasks</div>
+  </div>
+  <div class="dashboard-card">
+    <div>⚠️</div>
+    <div id="dash-bottleneck-count">0</div>
+    <div>Bottleneck</div>
+  </div>
+  <div class="dashboard-card">
+    <div>👥</div>
+    <div id="dash-member-count">0</div>
+    <div>Team</div>
+  </div>
+</div>
+
+<!-- Filter/Search Bar -->
+<div class="filter-bar">
+  <input type="text" placeholder="ค้นหางาน..." id="filter-search" style="flex:1;">
+  <select id="filter-type">
+    <option value="">ประเภทงาน</option>
+    <option value="JIG">JIG</option>
+    <option value="CF">CF</option>
+    <option value="FIXTURE">FIXTURE</option>
+    <option value="AUTOMATION">AUTOMATION</option>
+  </select>
+  <select id="filter-status">
+    <option value="">สถานะ</option>
+    <option value="เสนอราคา">เสนอราคา</option>
+    <option value="ออกแบบ">ออกแบบ</option>
+    <option value="2D">2D</option>
+    <option value="3D">3D</option>
+    <option value="APP">APP</option>
+    <option value="ผลิต">ผลิต</option>
+    <option value="ติดตั้ง">ติดตั้ง</option>
+    <option value="ส่งมอบ">ส่งมอบ</option>
+    <option value="bottleneck">Bottleneck</option>
+  </select>
+  <button class="export-btn">Export</button>
+</div>
+
+<!-- Notification Bar -->
+<div class="notification-bar" id="notification-bar" style="display:none;">แจ้งเตือนงาน bottleneck หรือ overdue</div>
+
+<!-- Kanban Workflow Board -->
+<div class="kanban-board">
+  <div class="kanban-column">
+    <div class="kanban-title">เสนอราคา</div>
+    <div class="kanban-task">JIG-001</div>
+    <div class="kanban-task">CF-002</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">ออกแบบ</div>
+    <div class="kanban-task">JIG-003</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">2D</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">3D</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">APP</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">ผลิต</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">ติดตั้ง</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">ส่งมอบ</div>
+  </div>
+  <div class="kanban-column">
+    <div class="kanban-title">Bottleneck</div>
+    <div class="kanban-task">FIXTURE-005</div>
+  </div>
+</div>
+
+<!-- Task Detail Example -->
+<div class="task-detail">
+  <h3>JIG-001 : ออกแบบ</h3>
+  <div>ประเภท: JIG</div>
+  <div>สถานะ: ออกแบบ</div>
+  <div>ผู้รับผิดชอบ: สมชาย</div>
+  <div>วันที่เริ่ม: 2026-03-01</div>
+  <div>วันที่สิ้นสุด: 2026-03-20</div>
+  <div>Bottleneck: <span style="color:#ef4444">❌</span></div>
+  <div>Comment: งานติดขัดที่ออกแบบ 3D</div>
+</div>
+
 
 <!-- ══════════════════ AUTH PAGE ══════════════════ -->
 <div id="auth-page">
