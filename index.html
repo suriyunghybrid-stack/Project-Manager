@@ -2159,7 +2159,7 @@ async function ensureDefaultTeam(user){
     const {data:newTeam} = await sb.from('teams').insert({
       name: 'ทีมหลัก',
       color: '#6366f1',
-      created_by: user.id
+      created_by: user?.id||null
     }).select().single();
 
     if(newTeam){
@@ -2177,6 +2177,26 @@ async function ensureDefaultTeam(user){
     console.warn('ensureDefaultTeam error:', e.message);
   }
 }
+
+// Fallback: ถ้า Auth Lock ทำให้ onAuthStateChange ไม่ fire ให้ getSession แทน
+(async()=>{
+  try{
+    const {data}=await sb.auth.getSession();
+    if(data?.session?.user && !currentUser){
+      // onAuthStateChange ยังไม่ fire — init ด้วยตัวเอง
+      const u=data.session.user;
+      currentUser=u;
+      document.getElementById('auth-page').style.display='none';
+      document.getElementById('app').style.display='block';
+      const name=u.user_metadata?.name||u.email.split('@')[0];
+      document.getElementById('user-name').textContent=name;
+      document.getElementById('user-email').textContent=u.email;
+      document.getElementById('user-av').textContent=name[0].toUpperCase();
+      await ensureDefaultTeam(u);
+      loadDashboard();setupRealtime();setupNotifCheck();loadSettings();setupKeepAlive();
+    }
+  }catch(e){console.warn('fallback init error:',e.message);}
+})();
 
 sb.auth.onAuthStateChange(async(event,session)=>{
   if(session?.user){
