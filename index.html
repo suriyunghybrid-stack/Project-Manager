@@ -2149,7 +2149,10 @@ async function ensureDefaultTeam(user){
   try{
     // เช็คว่ามีทีมอยู่ในระบบแล้วไหม
     const {data:teams} = await sb.from('teams').select('id').limit(1);
-    if(teams && teams.length > 0) return; // มีทีมแล้ว → ปล่อยให้ user เลือกเองในหน้า Team
+    if(teams && teams.length > 0){
+      currentTeamId = teams[0].id; // set ทีมแรกที่เจอ
+      return;
+    }
 
     // ยังไม่มีทีมเลยในระบบ → สร้าง "ทีมหลัก" ให้เป็นจุดเริ่มต้น
     const userName = user.user_metadata?.name || user.email.split('@')[0];
