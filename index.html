@@ -3898,7 +3898,7 @@ async function loadTeam(){
     html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">';
     html+='<div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">';
     html+='<span style="width:12px;height:12px;border-radius:50%;background:'+(team.color||'#6366f1')+';display:inline-block;"></span>'+esc(team.name)+'</div>';
-    if(team.id)html+='<button class="btn btn-ghost btn-sm" onclick="openTeamModal(''+team.id+'')">✏️</button>';
+    if(team.id)html+='<button class="btn btn-ghost btn-sm" onclick="openTeamModal(\''+team.id+'\')">✏️</button>';
     html+='</div>';
     html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:16px;">';
     members.forEach(function(m){
@@ -3910,8 +3910,8 @@ async function loadTeam(){
       html+='<div style="font-size:12px;color:var(--text-muted);">'+esc(m.role_title||'สมาชิก')+'</div>';
       html+='<span style="font-size:11px;color:var(--primary);">'+(m.member_type==='leader'?'👑 Leader':'👤 Member')+'</span></div>';
       html+='<div style="display:flex;gap:4px;">';
-      html+='<button class="btn btn-ghost btn-sm" onclick="openMemModal(''+m.id+'')" title="แก้ไข">✏️</button>';
-      html+='<button class="btn btn-ghost btn-sm" onclick="delMember(''+m.id+'')" style="color:var(--danger);" title="ลบ">🗑️</button>';
+      html+='<button class="btn btn-ghost btn-sm" onclick="openMemModal(\''+m.id+'\')" title="แก้ไข">✏️</button>';
+      html+='<button class="btn btn-ghost btn-sm" onclick="delMember(\''+m.id+'\')" style="color:var(--danger);" title="ลบ">🗑️</button>';
       html+='</div></div>';
     });
     html+='</div></div>';
