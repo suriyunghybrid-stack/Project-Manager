@@ -1662,8 +1662,8 @@ sb.auth.onAuthStateChange(async(event,session)=>{
     document.getElementById('user-name').textContent=name;
     document.getElementById('user-email').textContent=session.user.email;
     document.getElementById('user-av').textContent=name[0].toUpperCase();
-    // สร้างทีม Default ถ้ายังไม่มี
-    await ensureDefaultTeam(session.user);
+    // สร้างทีม Default ถ้ายังไม่มี (timeout 5s to avoid blocking dashboard)
+    await Promise.race([ensureDefaultTeam(session.user),new Promise(r=>setTimeout(r,5000))]);
     loadDashboard();
     setupRealtime();
     setupNotifCheck();
