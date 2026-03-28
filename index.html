@@ -1707,12 +1707,27 @@ document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click
 async function loadDashboard(){
   loadDashPrefs();
   checkNotifications();
-  const[{data:projs},{data:tasks},{data:mems},{data:acts}]=await Promise.all([
-    sb.from('projects').select('*'),
-    sb.from('tasks').select('*'),
-    sb.from('team_members').select('*'),
-    sb.from('activities').select('*').order('created_at',{ascending:false}).limit(10)
-  ]);
+  let projs,tasks,mems,acts;
+  try{
+    const r=await Promise.all([
+      sb.from('projects').select('*'),
+      sb.from('tasks').select('*'),
+      sb.from('team_members').select('*'),
+      sb.from('activities').select('*').order('created_at',{ascending:false}).limit(10)
+    ]);
+    projs=r[0].data;tasks=r[1].data;mems=r[2].data;acts=r[3].data;
+    if(r[0].error||r[1].error||r[2].error||r[3].error){
+      const errs=[r[0].error,r[1].error,r[2].error,r[3].error].filter(Boolean).map(e=>e.message).join('; ');
+      console.warn('[loadDashboard] query errors:',errs);
+      const dp=document.getElementById('d-proj');
+      if(dp)dp.innerHTML='<div style="color:#dc2626;padding:12px;font-size:13px;">⚠️ DB Error: '+errs+'</div>';
+    }
+  }catch(e){
+    console.error('[loadDashboard] fetch error:',e);
+    const dp=document.getElementById('d-proj');
+    if(dp)dp.innerHTML='<div style="color:#dc2626;padding:12px;font-size:13px;">⚠️ Network Error: '+e.message+'</div>';
+    return;
+  }
   const today=new Date();today.setHours(0,0,0,0);
   const overdue=(tasks||[]).filter(t=>t.due_date&&new Date(t.due_date)<today&&t.status!=='done');
   const inprog=(tasks||[]).filter(t=>t.status==='inprogress');
