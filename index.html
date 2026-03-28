@@ -1708,24 +1708,27 @@ async function loadDashboard(){
   loadDashPrefs();
   checkNotifications();
   let projs,tasks,mems,acts;
+  const _withTimeout=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('Supabase timeout after '+ms+'ms — project may be paused')),ms))]);
   try{
-    const r=await Promise.all([
+    const r=await _withTimeout(Promise.all([
       sb.from('projects').select('*'),
       sb.from('tasks').select('*'),
       sb.from('team_members').select('*'),
       sb.from('activities').select('*').order('created_at',{ascending:false}).limit(10)
-    ]);
+    ]),10000);
     projs=r[0].data;tasks=r[1].data;mems=r[2].data;acts=r[3].data;
-    if(r[0].error||r[1].error||r[2].error||r[3].error){
-      const errs=[r[0].error,r[1].error,r[2].error,r[3].error].filter(Boolean).map(e=>e.message).join('; ');
-      console.warn('[loadDashboard] query errors:',errs);
+    const qErr=[r[0].error,r[1].error,r[2].error,r[3].error].filter(Boolean);
+    if(qErr.length){
+      const msg=qErr.map(e=>e.message).join('; ');
+      console.warn('[loadDashboard] query errors:',msg);
       const dp=document.getElementById('d-proj');
-      if(dp)dp.innerHTML='<div style="color:#dc2626;padding:12px;font-size:13px;">⚠️ DB Error: '+errs+'</div>';
+      if(dp)dp.innerHTML='<div style="color:#dc2626;padding:12px;font-size:13px;">⚠️ DB Error: '+msg+'</div>';
     }
   }catch(e){
-    console.error('[loadDashboard] fetch error:',e);
+    console.error('[loadDashboard] error:',e.message);
     const dp=document.getElementById('d-proj');
-    if(dp)dp.innerHTML='<div style="color:#dc2626;padding:12px;font-size:13px;">⚠️ Network Error: '+e.message+'</div>';
+    if(dp)dp.innerHTML='<div style="color:#dc2626;padding:12px;font-size:13px;">⚠️ '+e.message+'</div>';
+    ['s-proj','s-task','s-done','s-mem','s-overdue','s-inprog'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='Err';});
     return;
   }
   const today=new Date();today.setHours(0,0,0,0);
