@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProjectPro — Online</title>
@@ -58,7 +59,7 @@ function _rtRefreshCurrent(){
   const active=document.querySelector('.page.active');
   if(!active)return;
   const name=active.id.replace('page-','');
-  const map={dashboard:loadDashboard,projects:loadProjects,tasks:loadTasks,gantt:loadGantt,calendar:loadCalendar,workload:loadWorkload,review:loadReviewBoard,portfolio:loadPortfolio,auditlog:loadAuditLog};
+  const map={dashboard:loadDashboard,jobboard:loadJobBoard,projects:loadProjects,tasks:loadTasks,gantt:loadGantt,workload:loadWorkload,auditlog:loadAuditLog};
   if(map[name])map[name]();
   checkNotifications();
 }
@@ -85,10 +86,15 @@ function setupRealtime(){
       } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
         _rtSetBadge(false);
         if(_settings.realtimeEnabled&&currentUser){
-          // exponential backoff: 3s, 6s, 12s, ... max 60s
           const delay=Math.min(3000*Math.pow(2,_rtRetryCount),60000);
           _rtRetryCount++;
           clearTimeout(_rtRetryTimer);
+          // ถ้า error เกิน 5 ครั้ง → reload อัตโนมัติ
+          // หยุด retry เมื่อเกิน 5 ครั้ง (ไม่ reload หน้า)
+          if(_rtRetryCount>=5){
+            console.log('[Realtime] Too many errors, stopped retrying.');
+            return;
+          }
           _rtRetryTimer=setTimeout(setupRealtime,delay);
         }
       }
@@ -105,6 +111,25 @@ function teardownRealtime(){
 function toggleRealtime(enable){
   if(enable)setupRealtime();else teardownRealtime();
 }
+
+// ── Auto-refresh เมื่อกลับมาเปิด Tab ──────────────────────────
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&currentUser){
+    // กลับมาเปิด Tab → เช็ค session และ refresh ข้อมูล
+    sb.auth.getSession().then(({data:{session}})=>{
+      if(!session){
+        // Session หมดอายุ → reload ให้ login ใหม่
+        window.location.reload();
+      } else {
+        // Session ยังอยู่ → refresh ข้อมูลปัจจุบัน
+        clearTimeout(_rtDebounce);
+        _rtDebounce=setTimeout(_rtRefreshCurrent,300);
+        // ถ้า Realtime ขาด → reconnect
+        if(!_rtChannel) setupRealtime();
+      }
+    });
+  }
+});
 
 // ══════════════════════════════════════════════
 //  NOTIFICATION CHECK (periodic)
@@ -173,89 +198,6 @@ async function testLineNotify(){
 // ══════════════════════════════════════════════
 //  PORTFOLIO DASHBOARD
 // ══════════════════════════════════════════════
-async function loadPortfolio(){
-  const today=new Date();today.setHours(0,0,0,0);
-  const soon=new Date(today);soon.setDate(today.getDate()+7);
-  const fmt=d=>d.toISOString().split('T')[0];
-
-  const[{data:projs},{data:tasks},{data:mems}]=await Promise.all([
-    sb.from('projects').select('*').order('created_at'),
-    sb.from('tasks').select('*').order('due_date'),
-    sb.from('team_members').select('*')
-  ]);
-  const P=projs||[],T=tasks||[],M=mems||[];
-
-  // ── Stats ──
-  const totalTasks=T.length;
-  const doneTasks=T.filter(t=>t.status==='done').length;
-  const overdueTasks=T.filter(t=>t.due_date&&new Date(t.due_date)<today&&t.status!=='done');
-  const pct=totalTasks?Math.round(doneTasks/totalTasks*100):0;
-  const PROJ_COLORS=['#6366f1','#ec4899','#f59e0b','#22c55e','#06b6d4','#8b5cf6','#ef4444','#10b981'];
-
-  document.getElementById('port-stats').innerHTML=[
-    {icon:'📁',val:P.length,label:'Projects ทั้งหมด',color:'#6366f1'},
-    {icon:'✅',val:totalTasks,label:'Tasks ทั้งหมด',color:'#22c55e'},
-    {icon:'👥',val:M.length,label:'สมาชิกทีม',color:'#06b6d4'},
-    {icon:'📊',val:pct+'%',label:'ความคืบหน้ารวม',color:'#f59e0b'},
-  ].map(s=>`<div class="port-stat">
-    <div class="port-stat-val" style="color:${s.color}">${s.val}</div>
-    <div class="port-stat-label">${s.label}</div>
-    <div class="port-stat-icon">${s.icon}</div>
-  </div>`).join('');
-
-  // ── Project Cards ──
-  document.getElementById('port-projects').innerHTML=P.map((p,pi)=>{
-    const pT=T.filter(t=>t.project_id===p.id);
-    const pDone=pT.filter(t=>t.status==='done').length;
-    const pPct=pT.length?Math.round(pDone/pT.length*100):0;
-    const color=PROJ_COLORS[pi%PROJ_COLORS.length];
-    const statusLabel={active:'🟢 Active',planning:'🔵 Planning',hold:'🟡 On Hold',done:'✅ Done'};
-    const overdue=pT.filter(t=>t.due_date&&new Date(t.due_date)<today&&t.status!=='done').length;
-    return `<div class="proj-card" onclick="showPage('projects',document.querySelector('.nav-item[onclick*=\'projects\']'))">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-        <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-        <div class="proj-card-name">${esc(p.name)}</div>
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;">
-        <span>${statusLabel[p.status]||p.status}</span>
-        <span>· ${pT.length} tasks</span>
-        ${overdue?`<span style="color:#ef4444;">· ⚠️ ${overdue} เกินกำหนด</span>`:''}
-      </div>
-      <div class="proj-progress-bar">
-        <div class="proj-progress-fill" style="width:${pPct}%;background:${color};"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
-        <span>${pDone}/${pT.length} เสร็จ</span><span style="font-weight:700;color:${color};">${pPct}%</span>
-      </div>
-    </div>`;
-  }).join('')||'<div style="color:var(--text-muted);font-size:13px;padding:20px;">ยังไม่มี Project ครับ</div>';
-
-  // ── Overdue ──
-  const OD=T.filter(t=>t.due_date&&new Date(t.due_date)<today&&t.status!=='done').sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));
-  document.getElementById('port-overdue').innerHTML=OD.length?OD.slice(0,8).map(t=>{
-    const p=P.find(p=>p.id===t.project_id);
-    const days=Math.round((today-new Date(t.due_date))/86400000);
-    return `<div class="mini-task-row">
-      <span style="font-size:11px;background:#fee2e2;color:#ef4444;border-radius:4px;padding:1px 6px;flex-shrink:0;">${days}วัน</span>
-      <span style="flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.name)}</span>
-      ${p?`<span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${esc(p.name)}</span>`:''}
-    </div>`;
-  }).join(''):'<div style="color:#22c55e;font-size:13px;padding:8px 0;">ไม่มีงานเกินกำหนด ✅</div>';
-
-  // ── Upcoming (7 days) ──
-  const UP=T.filter(t=>t.due_date&&new Date(t.due_date)>=today&&new Date(t.due_date)<=soon&&t.status!=='done').sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));
-  document.getElementById('port-upcoming').innerHTML=UP.length?UP.slice(0,8).map(t=>{
-    const p=P.find(p=>p.id===t.project_id);
-    const days=Math.round((new Date(t.due_date)-today)/86400000);
-    const dayColor=days===0?'#ef4444':days<=2?'#f59e0b':'#22c55e';
-    return `<div class="mini-task-row">
-      <span style="font-size:11px;background:#fef9c3;color:${dayColor};border-radius:4px;padding:1px 6px;flex-shrink:0;font-weight:700;">${days===0?'วันนี้':'อีก '+days+'วัน'}</span>
-      <span style="flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.name)}</span>
-      ${p?`<span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${esc(p.name)}</span>`:''}
-    </div>`;
-  }).join(''):'<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">ไม่มีงานในอีก 7 วัน</div>';
-}
-
 </script>
 <style>
 :root {
@@ -280,6 +222,46 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);mi
 .auth-msg{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
 .auth-error{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;}
 .auth-success{background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a;}
+/* UX/UI Effects for Professional App */
+.dashboard-card, .kanban-task, .kanban-title {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.dashboard-card:hover, .kanban-task:hover {
+  box-shadow: 0 4px 16px rgba(99,102,241,0.15);
+  transform: translateY(-2px) scale(1.04);
+  background: #eef2ff;
+}
+.dashboard-card:hover i, .kanban-title:hover i {
+  color: #8b5cf6;
+}
+.kanban-title {
+  position: relative;
+}
+.kanban-title[data-tooltip]:hover:after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: 120%;
+  transform: translateX(-50%);
+  background: #6366f1;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.15);
+  z-index: 10;
+}
+/* Ripple effect on click */
+.dashboard-card:active, .kanban-task:active {
+  animation: ripple 0.3s;
+}
+@keyframes ripple {
+  0% { box-shadow: 0 0 0 0 #6366f1; }
+  50% { box-shadow: 0 0 0 8px #6366f1; }
+  100% { box-shadow: 0 0 0 0 #6366f1; }
+}
 
 /* LAYOUT */
 #app{display:none;}
@@ -777,7 +759,6 @@ select.form-input option{background:#fff;}
 </style>
 </head>
 <body>
-
 <!-- ══════════════════ AUTH PAGE ══════════════════ -->
 <div id="auth-page">
   <div class="auth-wrap">
@@ -819,17 +800,15 @@ select.form-input option{background:#fff;}
       </div>
       <div class="nav-item" onclick="openSearch()" id="nav-search" title="ค้นหา (Ctrl+K)"><span class="nav-icon">🔍</span><span>Search</span></div>
       <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="nav-icon">📊</span><span>Dashboard</span></div>
+      <div class="nav-item" onclick="showPage('jobboard',this);setTimeout(loadJobBoard,100);"><span class="nav-icon">🗂️</span><span>Job Board</span></div>
       <div class="nav-item" onclick="showPage('projects',this)"><span class="nav-icon">📁</span><span>Projects</span></div>
       <div class="nav-item" onclick="showPage('tasks',this)"><span class="nav-icon">✅</span><span>Tasks</span></div>
       <div class="nav-item" onclick="showPage('gantt',this)"><span class="nav-icon">📅</span><span>Gantt</span></div>
-      <div class="nav-item" onclick="showPage('calendar',this)"><span class="nav-icon">🗓️</span><span>Calendar</span></div>
       <div class="nav-item" onclick="showPage('team',this)"><span class="nav-icon">👥</span><span>Team</span></div>
       <div class="nav-item" onclick="showPage('workload',this)"><span class="nav-icon">⚖️</span><span>Workload</span></div>
-      <div class="nav-item" onclick="showPage('review',this)"><span class="nav-icon">🔍</span><span>Review Board</span></div>
       <div class="nav-item" onclick="showPage('auditlog',this)"><span class="nav-icon">📋</span><span>Audit Log</span></div>
       <div class="nav-item" onclick="showPage('production',this);setTimeout(loadProduction,100);"><span class="nav-icon">🏭</span><span>Production</span></div>
       <div class="nav-item" onclick="showPage('qc',this);setTimeout(loadQCRecords,100);"><span class="nav-icon">🔬</span><span>QC Records</span></div>
-      <div class="nav-item" onclick="showPage('portfolio',this)"><span class="nav-icon">🗂</span><span>Portfolio</span></div>
             <div class="notif-wrap">
         <button class="notif-bell" onclick="toggleNotifPanel()" title="แจ้งเตือน">
           🔔<span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:50%;font-size:10px;font-weight:700;min-width:18px;height:18px;display:none;align-items:center;justify-content:center;line-height:1;">0</span>
@@ -897,6 +876,16 @@ select.form-input option{background:#fff;}
         <div class="dash-grid">
           <div id="dash-progress-card" class="card"><div style="font-weight:700;margin-bottom:4px">📁 Projects Progress</div><div id="d-proj"><div class="loading">⏳ กำลังโหลด...</div></div></div>
           <div id="dash-activity-card" class="card"><div style="font-weight:700;margin-bottom:4px">🕐 Recent Activity</div><div id="d-act"><div class="loading">⏳ กำลังโหลด...</div></div></div>
+        </div>
+        <div class="dash-grid" style="margin-top:16px;">
+          <div class="card">
+            <div style="font-weight:700;margin-bottom:10px;">📅 ครบกำหนดใน 7 วัน</div>
+            <div id="d-upcoming"><div class="loading">⏳ กำลังโหลด...</div></div>
+          </div>
+          <div class="card">
+            <div style="font-weight:700;margin-bottom:10px;">🚀 Job ล่าสุด</div>
+            <div id="d-recent-jobs"><div class="loading">⏳ กำลังโหลด...</div></div>
+          </div>
         </div>
       </div>
 
@@ -1059,41 +1048,6 @@ select.form-input option{background:#fff;}
         </div>
       </div>
 
-      <!-- CALENDAR -->
-      <div id="page-calendar" class="page">
-        <div class="page-header">
-          <div class="page-title">🗓️ Calendar</div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-ghost btn-sm" onclick="calPrev()">‹</button>
-            <span id="cal-label" style="font-size:15px;font-weight:700;color:var(--text);min-width:160px;text-align:center"></span>
-            <button class="btn btn-ghost btn-sm" onclick="calNext()">›</button>
-            <button class="btn btn-ghost btn-sm" onclick="calToday()">วันนี้</button>
-            <button class="btn btn-ghost btn-sm" onclick="loadCalendar()" title="รีเฟรชข้อมูล">🔄 Refresh</button>
-          </div>
-        </div>
-        <div class="card" style="padding:0;overflow:hidden;">
-          <!-- Day headers -->
-          <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border);">
-            <div style="padding:12px;text-align:center;font-size:12px;font-weight:700;color:var(--danger);">อา</div>
-            <div style="padding:12px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted);">จ</div>
-            <div style="padding:12px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted);">อ</div>
-            <div style="padding:12px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted);">พ</div>
-            <div style="padding:12px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted);">พฤ</div>
-            <div style="padding:12px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted);">ศ</div>
-            <div style="padding:12px;text-align:center;font-size:12px;font-weight:700;color:#6366f1;">ส</div>
-          </div>
-          <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);"></div>
-        </div>
-        <!-- Task detail popup -->
-        <div id="cal-popup" style="display:none;position:fixed;inset:0;z-index:150;align-items:center;justify-content:center;" onclick="document.getElementById('cal-popup').style.display='none'">
-          <div onclick="event.stopPropagation()" style="background:#fff;border-radius:14px;padding:24px;width:360px;box-shadow:0 20px 40px rgba(0,0,0,.15);border:1px solid var(--border);">
-            <div style="font-weight:700;font-size:16px;margin-bottom:16px;">📋 Tasks วันนี้</div>
-            <div id="cal-popup-list"></div>
-            <button onclick="document.getElementById('cal-popup').style.display='none'" class="btn btn-ghost btn-sm" style="margin-top:16px;width:100%">ปิด</button>
-          </div>
-        </div>
-      </div>
-
       <!-- TEAM -->
       <div id="page-team" class="page">
         <div class="page-header"><div class="page-title">👥 Team</div><button class="btn btn-primary" onclick="openMemModal()">+ เพิ่มสมาชิก</button></div>
@@ -1115,39 +1069,6 @@ select.form-input option{background:#fff;}
         <div id="wl-member-grid" class="wl-member-grid"></div>
       </div>
 
-
-      <!-- REVIEW BOARD -->
-      <div id="page-review" class="page">
-        <div class="page-header">
-          <div class="page-title">🔍 Review Board</div>
-          <button class="btn btn-primary" onclick="openRbModal()">+ เพิ่ม Analysis</button>
-        </div>
-
-        <!-- Toolbar -->
-        <div class="rb-toolbar">
-          <input class="rb-search" id="rb-search" type="text" placeholder="🔍 Search..." oninput="renderReviewBoard()">
-          <select class="rb-filter-select" id="rb-filter-proj" onchange="renderReviewBoard()">
-            <option value="">📁 ทุก Project</option>
-          </select>
-          <select class="rb-filter-select" id="rb-filter-go" onchange="renderReviewBoard()">
-            <option value="">✅ Go/No-Go ทั้งหมด</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="pending">Pending</option>
-            <option value="hold">On Hold</option>
-          </select>
-          <select class="rb-filter-select" id="rb-filter-risk" onchange="renderReviewBoard()">
-            <option value="">⚠️ Risk ทั้งหมด</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-        </div>
-
-        <div id="rb-content"></div>
-      </div>
-
       <!-- AUDIT LOG -->
       <div id="page-auditlog" class="page">
         <div class="page-header">
@@ -1167,51 +1088,96 @@ select.form-input option{background:#fff;}
         </div>
       </div>
 
-
-      <!-- PORTFOLIO -->
-      <div id="page-portfolio" class="page">
+      <!-- ══ JOB BOARD ══ -->
+      <div id="page-jobboard" class="page">
         <div class="page-header">
-          <div class="page-title">🗂 Portfolio Overview</div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div id="rt-page-badge" class="rt-badge"><span class="rt-dot"></span><span id="rt-page-label">Offline</span></div>
-            <button class="btn btn-ghost btn-sm" onclick="loadPortfolio()">🔄 Refresh</button>
-          </div>
+          <div class="page-title">🗂️ Job Board</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadJobBoard()">🔄 Refresh</button>
         </div>
-        <!-- 4 stat cards -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;" id="port-stats"></div>
-        <!-- Project cards -->
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">📁 Projects ทั้งหมด</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;" id="port-projects"></div>
-        <!-- Bottom: overdue + upcoming -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div class="card" style="padding:16px;">
-            <div style="font-size:13px;font-weight:700;color:#ef4444;margin-bottom:10px;">⚠️ งานเกินกำหนด</div>
-            <div id="port-overdue"><div style="color:var(--text-muted);font-size:13px;padding:12px 0;">ไม่มีงานเกินกำหนด ✅</div></div>
-          </div>
-          <div class="card" style="padding:16px;">
-            <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:10px;">📅 ครบกำหนดใน 7 วัน</div>
-            <div id="port-upcoming"><div style="color:var(--text-muted);font-size:13px;padding:12px 0;">กำลังโหลด...</div></div>
-          </div>
+
+        <!-- Filters -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
+          <input class="form-input" id="jb-search" placeholder="🔍 ค้นหา Job No. / Part No. / ลูกค้า..." style="width:260px;font-size:13px;"
+            oninput="renderJobBoard()">
+          <select class="form-input" id="jb-type" style="width:160px;font-size:13px;" onchange="renderJobBoard()">
+            <option value="">ทุกประเภท</option>
+            <option value="JIG">JIG</option>
+            <option value="FIXTURE">FIXTURE</option>
+            <option value="AUTOMATION">AUTOMATION</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+          <select class="form-input" id="jb-status" style="width:160px;font-size:13px;" onchange="renderJobBoard()">
+            <option value="">ทุก Status</option>
+            <option value="draft">Draft</option>
+            <option value="released">Released</option>
+            <option value="inprogress">In Progress</option>
+            <option value="qc">QC Check</option>
+            <option value="done">Done</option>
+            <option value="onhold">On Hold</option>
+            <option value="late">Late</option>
+          </select>
+          <select class="form-input" id="jb-customer" style="width:160px;font-size:13px;" onchange="renderJobBoard()">
+            <option value="">ทุกลูกค้า</option>
+          </select>
+        </div>
+
+        <!-- Status Summary Bar -->
+        <div id="jb-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;"></div>
+
+        <!-- Job Cards -->
+        <div id="jb-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;">
+          <div class="loading">⏳ กำลังโหลด...</div>
         </div>
       </div>
-
 
       <!-- ══ PRODUCTION BOARD ══ -->
       <div id="page-production" class="page">
         <div class="page-header">
           <div>
             <div class="page-title">🏭 Production Stage Board</div>
-            <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">ติดตามสถานะการผลิตตามขั้นตอน Jig &amp; Fixture</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">ติดตามสถานะการผลิตแบบ Real-time · ลากการ์ดเพื่อย้าย Stage ได้เลย</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <select class="form-input" id="prod-proj-filter" onchange="loadProduction()" style="width:180px;font-size:13px;">
-              <option value="">— ทุก Project —</option>
-            </select>
             <button class="btn btn-ghost btn-sm" onclick="loadProduction()">🔄 Refresh</button>
           </div>
         </div>
-        <div id="prod-board" style="overflow-x:auto;padding-bottom:12px;">
-          <div style="color:var(--text-muted);padding:24px;text-align:center;">⏳ กำลังโหลด...</div>
+
+        <!-- KPI Bar -->
+        <div id="prod-kpi-bar" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
+
+        <!-- Bottleneck Alert -->
+        <div id="prod-bottleneck-alert" style="display:none;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:10px 16px;margin-bottom:14px;align-items:center;gap:10px;">
+          <span style="font-size:18px;">🚨</span>
+          <div>
+            <div style="font-weight:700;color:#b91c1c;font-size:13px;" id="prod-alert-title"></div>
+            <div style="font-size:12px;color:#dc2626;" id="prod-alert-body"></div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+          <span style="font-size:13px;">🔍</span>
+          <input type="text" id="prod-search" placeholder="ค้นหา Task, Project..." oninput="filterProduction()"
+            style="flex:1;min-width:160px;border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px;outline:none;background:var(--bg);">
+          <select id="prod-customer-filter" onchange="filterProduction()"
+            style="border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px;background:var(--bg);cursor:pointer;">
+            <option value="">🏭 ทุก Customer</option>
+          </select>
+          <select id="prod-staff-filter" onchange="filterProduction()"
+            style="border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px;background:var(--bg);cursor:pointer;">
+            <option value="">👤 ทุก Staff</option>
+          </select>
+          <select class="form-input" id="prod-proj-filter" onchange="loadProduction()" style="width:160px;font-size:13px;">
+            <option value="">— ทุก Project —</option>
+          </select>
+          <button onclick="clearProdFilters()"
+            style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);cursor:pointer;color:var(--text-muted);">✕ ล้าง</button>
+        </div>
+
+        <div style="overflow-x:auto;padding-bottom:12px;">
+          <div id="prod-board">
+            <div style="color:var(--text-muted);padding:24px;text-align:center;">⏳ กำลังโหลด...</div>
+          </div>
         </div>
       </div>
 
@@ -1600,6 +1566,7 @@ const sb = createClient(
 );
 
 let currentUser = null;
+let pgData=[],pgCollapsed={};
 let currentTeamId = null;
 let dragId = null;
 let taskView = 'kanban'; // 'kanban' | 'list'
@@ -1655,6 +1622,37 @@ async function doRegister(){
 
 async function doLogout(){await sb.auth.signOut();}
 
+// ── Auto-create Default Team on first login ──────────────────
+async function ensureDefaultTeam(user){
+  try{
+    // เช็คว่ามีทีมอยู่ในระบบแล้วไหม
+    const {data:teams} = await sb.from('teams').select('id').limit(1);
+    if(teams && teams.length > 0) return; // มีทีมแล้ว → ปล่อยให้ user เลือกเองในหน้า Team
+
+    // ยังไม่มีทีมเลยในระบบ → สร้าง "ทีมหลัก" ให้เป็นจุดเริ่มต้น
+    const userName = user.user_metadata?.name || user.email.split('@')[0];
+    const {data:newTeam} = await sb.from('teams').insert({
+      name: 'ทีมหลัก',
+      color: '#6366f1',
+      created_by: user.id
+    }).select().single();
+
+    if(newTeam){
+      currentTeamId = newTeam.id;
+      // เพิ่ม user แรกเป็น Leader อัตโนมัติ
+      await sb.from('team_members').insert({
+        name: userName,
+        role_title: 'Admin',
+        team_id: newTeam.id,
+        member_type: 'leader',
+        created_by: user.id
+      });
+    }
+  }catch(e){
+    console.warn('ensureDefaultTeam error:', e.message);
+  }
+}
+
 sb.auth.onAuthStateChange(async(event,session)=>{
   if(session?.user){
     currentUser=session.user;
@@ -1664,6 +1662,8 @@ sb.auth.onAuthStateChange(async(event,session)=>{
     document.getElementById('user-name').textContent=name;
     document.getElementById('user-email').textContent=session.user.email;
     document.getElementById('user-av').textContent=name[0].toUpperCase();
+    // สร้างทีม Default ถ้ายังไม่มี
+    await ensureDefaultTeam(session.user);
     loadDashboard();
     setupRealtime();
     setupNotifCheck();
@@ -1685,15 +1685,13 @@ function showPage(name,el){
   document.getElementById('page-'+name).classList.add('active');
   if(el)el.classList.add('active');
   if(name==='dashboard')loadDashboard();
+  if(name==='jobboard')loadJobBoard();
   if(name==='projects')loadProjects();
   if(name==='tasks')loadTasks();
   if(name==='gantt')loadGantt();
-  if(name==='calendar')loadCalendar();
   if(name==='team')loadTeam();
   if(name==='workload')loadWorkload();
-  if(name==='review')loadReviewBoard();
   if(name==='auditlog')loadAuditLog();
-  if(name==='portfolio')loadPortfolio();
 }
 
 // ══════════════════════════════════════════════
@@ -1750,6 +1748,182 @@ async function loadDashboard(){
   const da=document.getElementById('d-act');
   if(!acts?.length){da.innerHTML='<div class="empty">ยังไม่มีกิจกรรมครับ</div>';}
   else{da.innerHTML=acts.map(a=>`<div class="act-item"><div class="act-dot"></div><div><div style="color:var(--text)">${esc(a.text||'')}</div><div style="color:var(--text-muted);font-size:11px">${new Date(a.created_at).toLocaleString('th-TH')}</div></div></div>`).join('');}
+
+  // Upcoming 7 วัน
+  const soon=new Date(today);soon.setDate(today.getDate()+7);
+  const upcoming=(tasks||[]).filter(t=>t.due_date&&new Date(t.due_date)>=today&&new Date(t.due_date)<=soon&&t.status!=='done')
+    .sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));
+  const du=document.getElementById('d-upcoming');
+  if(du){
+    if(!upcoming.length){du.innerHTML='<div class="empty">ไม่มีงานครบกำหนดใน 7 วัน ✅</div>';}
+    else{du.innerHTML=upcoming.slice(0,6).map(t=>{
+      const days=Math.round((new Date(t.due_date)-today)/86400000);
+      const col=days===0?'#ef4444':days<=2?'#f59e0b':'#22c55e';
+      const lbl=days===0?'วันนี้':'อีก '+days+'วัน';
+      const proj=(projs||[]).find(p=>p.id===t.project_id);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:11px;background:#fef9c3;color:${col};border-radius:6px;padding:2px 8px;font-weight:700;flex-shrink:0;">${lbl}</span>
+        <span style="flex:1;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.name)}</span>
+        ${proj?`<span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${esc(proj.name)}</span>`:''}
+      </div>`;
+    }).join('');}
+  }
+
+  // Recent Jobs (latest projects)
+  const drj=document.getElementById('d-recent-jobs');
+  if(drj){
+    const JOB_STATUS={draft:{lbl:'Draft',bg:'#f1f5f9',col:'#64748b'},released:{lbl:'Released',bg:'#dbeafe',col:'#1d4ed8'},
+      inprogress:{lbl:'In Progress',bg:'#e0e7ff',col:'#4338ca'},qc:{lbl:'QC Check',bg:'#fef9c3',col:'#b45309'},
+      done:{lbl:'Done',bg:'#dcfce7',col:'#15803d'},onhold:{lbl:'On Hold',bg:'#fee2e2',col:'#dc2626'},
+      late:{lbl:'Late',bg:'#fee2e2',col:'#dc2626'}};
+    const recent=(projs||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,6);
+    if(!recent.length){drj.innerHTML='<div class="empty">ยังไม่มี Job ครับ</div>';}
+    else{drj.innerHTML=recent.map(p=>{
+      const st=JOB_STATUS[p.status]||{lbl:p.status||'Draft',bg:'#f1f5f9',col:'#64748b'};
+      const pt=(tasks||[]).filter(t=>t.project_id===p.id);
+      const dn=pt.filter(t=>t.status==='done').length;
+      const pct=pt.length?Math.round(dn/pt.length*100):0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:11px;background:${st.bg};color:${st.col};border-radius:6px;padding:2px 8px;flex-shrink:0;font-weight:600;">${st.lbl}</span>
+        <span style="flex:1;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</span>
+        <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${pct}%</span>
+      </div>`;
+    }).join('');}
+  }
+}
+
+// ══════════════════════════════════════════════
+//  JOB BOARD
+// ══════════════════════════════════════════════
+let _jbData = [];
+
+const JB_STATUS_CFG = {
+  draft:      {lbl:'Draft',      bg:'#f1f5f9', col:'#64748b', order:0},
+  released:   {lbl:'Released',   bg:'#dbeafe', col:'#1d4ed8', order:1},
+  inprogress: {lbl:'In Progress',bg:'#e0e7ff', col:'#4338ca', order:2},
+  qc:         {lbl:'QC Check',   bg:'#fef9c3', col:'#b45309', order:3},
+  done:       {lbl:'Done',       bg:'#dcfce7', col:'#15803d', order:4},
+  onhold:     {lbl:'On Hold',    bg:'#fee2e2', col:'#dc2626', order:5},
+  late:       {lbl:'Late',       bg:'#ffd4d4', col:'#991b1b', order:6},
+};
+
+async function loadJobBoard(){
+  const grid=document.getElementById('jb-grid');
+  if(!grid) return;
+  grid.innerHTML='<div class="loading">⏳ กำลังโหลด...</div>';
+
+  const [{data:projs},{data:tasks}]=await Promise.all([
+    sb.from('projects').select('*').order('created_at',{ascending:false}),
+    sb.from('tasks').select('*')
+  ]);
+  _jbData = projs||[];
+
+  // populate customer dropdown
+  const sel=document.getElementById('jb-customer');
+  if(sel){
+    const customers=[...new Set((_jbData).map(p=>p.customer).filter(Boolean))].sort();
+    const cur=sel.value;
+    sel.innerHTML='<option value="">ทุกลูกค้า</option>'+
+      customers.map(c=>`<option value="${c}" ${cur===c?'selected':''}>${c}</option>`).join('');
+  }
+
+  // attach tasks count to each job
+  _jbData = _jbData.map(p=>{
+    const pt=(tasks||[]).filter(t=>t.project_id===p.id);
+    return {...p, _tasks:pt, _done:pt.filter(t=>t.status==='done').length};
+  });
+
+  renderJobBoard();
+}
+
+function renderJobBoard(){
+  const grid=document.getElementById('jb-grid');
+  if(!grid) return;
+
+  const search=(document.getElementById('jb-search')?.value||'').toLowerCase();
+  const fType =(document.getElementById('jb-type')?.value||'');
+  const fStat =(document.getElementById('jb-status')?.value||'');
+  const fCust =(document.getElementById('jb-customer')?.value||'');
+  const today =new Date(); today.setHours(0,0,0,0);
+
+  let jobs=_jbData;
+  if(search) jobs=jobs.filter(j=>
+    (j.name||'').toLowerCase().includes(search)||
+    (j.job_no||'').toLowerCase().includes(search)||
+    (j.part_no||'').toLowerCase().includes(search)||
+    (j.customer||'').toLowerCase().includes(search)
+  );
+  if(fType) jobs=jobs.filter(j=>(j.job_type||'').toUpperCase()===fType);
+  if(fStat) jobs=jobs.filter(j=>(j.status||'draft')===fStat);
+  if(fCust) jobs=jobs.filter(j=>j.customer===fCust);
+
+  // auto-flag late (ถ้า due_date เกินและยังไม่ done)
+  jobs=jobs.map(j=>{
+    const isLate=j.due_date&&new Date(j.due_date)<today&&j.status!=='done';
+    return {...j, _isLate:isLate};
+  });
+
+  // Summary bar
+  const summary=document.getElementById('jb-summary');
+  if(summary){
+    const counts={};
+    _jbData.forEach(j=>{
+      const key=j._isLate?'late':(j.status||'draft');
+      counts[key]=(counts[key]||0)+1;
+    });
+    summary.innerHTML=Object.entries(JB_STATUS_CFG)
+      .filter(([k])=>counts[k])
+      .map(([k,v])=>`
+        <div style="display:flex;align-items:center;gap:6px;background:${v.bg};border-radius:20px;padding:5px 14px;cursor:pointer;border:2px solid ${document.getElementById('jb-status')?.value===k?v.col:'transparent'};"
+          onclick="document.getElementById('jb-status').value=document.getElementById('jb-status').value==='${k}'?'':'${k}';renderJobBoard()">
+          <span style="font-size:13px;font-weight:700;color:${v.col};">${v.lbl}</span>
+          <span style="font-size:13px;font-weight:800;color:${v.col};">${counts[k]}</span>
+        </div>`).join('');
+  }
+
+  if(!jobs.length){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1;padding:40px;">ไม่พบ Job ที่ตรงเงื่อนไข</div>';
+    return;
+  }
+
+  grid.innerHTML=jobs.map(j=>{
+    const st=JB_STATUS_CFG[j._isLate?'late':(j.status||'draft')]||JB_STATUS_CFG.draft;
+    const pct=j._tasks.length?Math.round(j._done/j._tasks.length*100):0;
+    const daysLeft=j.due_date?Math.round((new Date(j.due_date)-today)/86400000):null;
+    const dueTxt=daysLeft===null?''
+      :daysLeft<0?`<span style="color:#ef4444;font-weight:700;">⚠️ เกิน ${Math.abs(daysLeft)}วัน</span>`
+      :daysLeft===0?`<span style="color:#f59e0b;font-weight:700;">🔥 วันนี้</span>`
+      :`<span style="color:#64748b;">เหลือ ${daysLeft}วัน</span>`;
+
+    return `<div class="card" style="padding:16px;cursor:default;border-left:4px solid ${st.col};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            title="${esc(j.name)}">${esc(j.name)}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+            ${j.job_no?`<span style="font-weight:600;">${esc(j.job_no)}</span> · `:'' }
+            ${j.part_no?`Part: ${esc(j.part_no)} · `:''}
+            ${j.customer?esc(j.customer):'ไม่ระบุลูกค้า'}
+          </div>
+        </div>
+        <span style="font-size:11px;background:${st.bg};color:${st.col};border-radius:8px;padding:3px 10px;font-weight:700;flex-shrink:0;margin-left:8px;">${st.lbl}</span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        ${j.job_type?`<span style="font-size:10px;background:var(--surface2);color:var(--text-muted);border-radius:6px;padding:2px 8px;font-weight:600;">${esc(j.job_type)}</span>`:''}
+        ${j.due_date?`<span style="font-size:11px;margin-left:auto;">${dueTxt}</span>`:''}
+      </div>
+
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px;">
+          <span>ความคืบหน้า</span><span>${j._done}/${j._tasks.length} tasks · ${pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${st.col};"></div></div>
+      </div>
+
+      ${j.designer?`<div style="font-size:11px;color:var(--text-muted);">🎨 Designer: ${esc(j.designer)}</div>`:''}
+    </div>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════
@@ -2614,17 +2788,47 @@ function exportProjectsPrint(){
   let html=`<html><head><meta charset="utf-8"><title>Projects Export</title>
   <style>body{font-family:sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}th{background:#f1f3f9;font-weight:700;}tr:nth-child(even){background:#f9fafb;}
 /* ── Production Board ── */
-.prod-board{display:flex;gap:14px;min-width:max-content;padding-bottom:8px;}
-.prod-col{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;width:160px;flex-shrink:0;overflow:hidden;transition:border-color .15s,box-shadow .15s;}
-.prod-col-head{padding:10px 12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-.prod-col-body{padding:8px;min-height:120px;display:flex;flex-direction:column;gap:7px;border-radius:0 0 10px 10px;transition:background .15s;}
-.prod-col-body.drag-over{background:#eef2ff;outline:2px dashed var(--primary);outline-offset:-4px;}
-.prod-card{background:#fff;border:1.5px solid var(--border);border-radius:7px;padding:8px 10px;font-size:12px;cursor:grab;transition:box-shadow .15s,transform .15s,opacity .15s;}
-.prod-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);}
-.prod-card.dragging{opacity:.35;transform:scale(.97) rotate(1.5deg);box-shadow:0 8px 24px rgba(99,102,241,.25);cursor:grabbing;border-color:var(--primary);}
-.prod-card-title{font-weight:600;margin-bottom:3px;line-height:1.3;}
-.prod-card-proj{font-size:11px;color:var(--text-muted);}
-.prod-card-assign{font-size:10px;color:var(--primary);margin-top:4px;font-weight:600;}
+/* ════════════ PRODUCTION STAGE BOARD — REDESIGN ════════════ */
+.prod-board{display:flex;flex-direction:row;gap:14px;min-width:max-content;padding-bottom:20px;align-items:flex-start;}
+
+/* Column */
+.prod-col{background:#f8fafc;border:1.5px solid var(--border);border-radius:16px;width:220px;flex-shrink:0;overflow:hidden;transition:box-shadow .2s;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.prod-col:hover{box-shadow:0 6px 20px rgba(0,0,0,.10);}
+
+/* Column Header */
+.prod-col-head{padding:0;border-bottom:none;display:flex;flex-direction:column;background:#fff;border-radius:16px 16px 0 0;overflow:hidden;}
+.prod-col-head-top{padding:11px 14px 10px;display:flex;justify-content:space-between;align-items:center;}
+.prod-col-head-bar{height:4px;width:100%;}
+.prod-col-head-label{display:flex;align-items:center;gap:7px;}
+.prod-col-head-icon{font-size:15px;line-height:1;}
+.prod-col-head-name{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;}
+.prod-col-head-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+
+/* Column Body */
+.prod-col-body{padding:10px;min-height:160px;display:flex;flex-direction:column;gap:8px;border-radius:0 0 16px 16px;transition:background .15s,outline .15s;}
+.prod-col-body.drag-over{background:#eef2ff;outline:2.5px dashed var(--primary);outline-offset:-4px;}
+
+/* Card */
+.prod-card{background:#fff;border:1.5px solid #e8edf3;border-radius:12px;padding:0;font-size:13px;cursor:grab;transition:box-shadow .18s,transform .18s,opacity .15s,border-color .15s;user-select:none;overflow:hidden;position:relative;}
+.prod-card:hover{box-shadow:0 6px 18px rgba(0,0,0,.11);transform:translateY(-2px);border-color:#a5b4fc;}
+.prod-card.dragging{opacity:.25;transform:scale(.95) rotate(1.5deg);box-shadow:0 12px 32px rgba(99,102,241,.25);cursor:grabbing;}
+.prod-card-priority-bar{height:3px;width:100%;}
+.prod-card-body{padding:10px 12px 11px;}
+.prod-card-title{font-weight:700;margin-bottom:5px;line-height:1.45;color:#1e293b;font-size:12.5px;}
+.prod-card-proj{font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px;}
+.prod-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:7px;border-top:1px solid #f1f5f9;}
+.prod-card-assign{font-size:11px;color:var(--primary);font-weight:600;display:flex;align-items:center;gap:5px;}
+.prod-card-assign-av{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0;}
+.prod-card-days{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;}
+.prod-card-stuck{background:#fef2f2;border-bottom:1px solid #fca5a5;padding:5px 12px;font-size:11px;font-weight:700;color:#dc2626;display:flex;align-items:center;gap:5px;}
+.prod-card-empty{color:#94a3b8;font-size:11px;text-align:center;padding:20px 12px;border:1.5px dashed #e2e8f0;border-radius:10px;background:#fafbfc;line-height:1.6;}
+
+/* KPI Bar */
+.prod-kpi-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:box-shadow .2s;}
+.prod-kpi-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.09);}
+.prod-kpi-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.prod-kpi-val{font-size:26px;font-weight:900;line-height:1;}
+.prod-kpi-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;opacity:.7;}
 .prod-drop-zone{border:2px dashed var(--primary);border-radius:7px;height:50px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--primary);display:none;}
 /* ── QC Records ── */
 .qc-result-pass{background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;}
@@ -2983,269 +3187,6 @@ document.addEventListener('mouseup',function(){
 });
 
 // ══════════════════════════════════════════════
-//  CALENDAR
-// ══════════════════════════════════════════════
-let calDate = new Date();
-let calAllTasks = [];
-let calAllProjects = [];
-
-function calPrev(){ calDate.setMonth(calDate.getMonth()-1); renderCalendar(); }
-function calNext(){ calDate.setMonth(calDate.getMonth()+1); renderCalendar(); }
-function calToday(){ calDate = new Date(); renderCalendar(); }
-
-async function loadCalendar(){
-  const grid = document.getElementById('cal-grid');
-  grid.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-muted)">⏳ กำลังโหลด...</div>';
-  const [{ data: projects }, { data: tasks }] = await Promise.all([
-    sb.from('projects').select('id,name,color').order('created_at'),
-    sb.from('tasks').select('id,name,status,priority,start_date,due_date,project_id').not('due_date','is',null).order('due_date')
-  ]);
-  calAllProjects = projects || [];
-  calAllTasks = tasks || [];
-  renderCalendar();
-}
-
-function renderCalendar(){
-  const y = calDate.getFullYear();
-  const m = calDate.getMonth();
-
-  // Update label
-  const label = calDate.toLocaleDateString('th-TH',{month:'long',year:'numeric'});
-  document.getElementById('cal-label').textContent = label;
-
-  const firstDay = new Date(y, m, 1);
-  const lastDay = new Date(y, m+1, 0);
-  const startDow = firstDay.getDay(); // 0=Sun
-  const totalDays = lastDay.getDate();
-
-  const today = new Date();
-  today.setHours(0,0,0,0);
-
-  // Build task map: key = "YYYY-MM-DD" => tasks[]
-  const taskMap = {};
-  calAllTasks.forEach(t => {
-    if(!t.due_date) return;
-    const key = t.due_date.slice(0,10);
-    if(!taskMap[key]) taskMap[key] = [];
-    taskMap[key].push(t);
-  });
-
-  const projMap = {};
-  calAllProjects.forEach(p => projMap[p.id] = p);
-
-  const STATUS_COLOR = { todo:'#94a3b8', inprogress:'#6366f1', review:'#f59e0b', done:'#22c55e' };
-  const PROJ_COLORS = ['#6366f1','#ec4899','#f59e0b','#22c55e','#06b6d4','#8b5cf6','#ef4444','#10b981'];
-
-  // Cells = startDow blanks + days + fill to 6 weeks
-  const totalCells = Math.ceil((startDow + totalDays) / 7) * 7;
-
-  let html = '';
-  for(let i = 0; i < totalCells; i++){
-    const dayNum = i - startDow + 1;
-    const isCurrentMonth = dayNum >= 1 && dayNum <= totalDays;
-    const dow = i % 7;
-
-    let cellDate = null;
-    let dateKey = '';
-    if(isCurrentMonth){
-      cellDate = new Date(y, m, dayNum);
-      cellDate.setHours(0,0,0,0);
-      dateKey = `${y}-${String(m+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
-    }
-
-    const isToday = cellDate && cellDate.getTime() === today.getTime();
-    const isSun = dow === 0;
-    const isSat = dow === 6;
-    const dayTasks = taskMap[dateKey] || [];
-
-    const cellBg = isToday ? '#eef2ff' : (!isCurrentMonth ? '#f8f9fc' : '#fff');
-    const numColor = isToday ? '#6366f1' : isSun ? 'var(--danger)' : isSat ? '#6366f1' : 'var(--text)';
-    const numBg = isToday ? '#6366f1' : 'transparent';
-    const numTextColor = isToday ? '#fff' : numColor;
-
-    html += `<div style="min-height:110px;padding:6px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:${cellBg};vertical-align:top;position:relative;"
-      onclick="calShowDay('${dateKey}',${JSON.stringify(dayTasks).replace(/"/g,'&quot;')})">`;
-
-    if(isCurrentMonth){
-      html += `<div style="display:inline-flex;width:26px;height:26px;align-items:center;justify-content:center;border-radius:50%;background:${numBg};color:${numTextColor};font-size:13px;font-weight:${isToday?'700':'500'};margin-bottom:4px;">${dayNum}</div>`;
-    }
-
-    // Show up to 3 task chips
-    dayTasks.slice(0,3).forEach(t => {
-      const proj = projMap[t.project_id];
-      const projIdx = calAllProjects.findIndex(p=>p.id===t.project_id);
-      const chipColor = STATUS_COLOR[t.status] || '#94a3b8';
-      html += `<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:${chipColor}22;color:${chipColor};border-left:3px solid ${chipColor};margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;"
-        title="${t.name}">${t.name}</div>`;
-    });
-    if(dayTasks.length > 3){
-      html += `<div style="font-size:11px;color:var(--text-muted);padding:2px 6px;">+${dayTasks.length-3} เพิ่มเติม</div>`;
-    }
-
-    html += `</div>`;
-  }
-
-  document.getElementById('cal-grid').innerHTML = html;
-}
-
-function calShowDay(dateKey, tasks){
-  if(!dateKey || !tasks || tasks.length === 0) return;
-  const STATUS_LABEL = { todo:'รอดำเนินการ', inprogress:'กำลังทำ', review:'รอตรวจ', done:'เสร็จแล้ว' };
-  const STATUS_COLOR = { todo:'#94a3b8', inprogress:'#6366f1', review:'#f59e0b', done:'#22c55e' };
-  const projMap = {};
-  calAllProjects.forEach(p => projMap[p.id] = p);
-
-  const d = new Date(dateKey);
-  const dateLabel = d.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-  let html = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">${dateLabel}</div>`;
-  tasks.forEach(t => {
-    const proj = projMap[t.project_id];
-    const sc = STATUS_COLOR[t.status] || '#94a3b8';
-    const sl = STATUS_LABEL[t.status] || t.status;
-    html += `<div style="padding:10px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;border-left:4px solid ${sc};">
-      <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${t.name}</div>
-      ${proj ? `<div style="font-size:12px;color:var(--text-muted);">📁 ${proj.name}</div>` : ''}
-      <div style="font-size:12px;margin-top:4px;"><span style="background:${sc}22;color:${sc};padding:2px 8px;border-radius:20px;font-weight:600;">${sl}</span></div>
-    </div>`;
-  });
-
-  document.getElementById('cal-popup-list').innerHTML = html;
-  const popup = document.getElementById('cal-popup');
-  popup.style.display = 'flex';
-}
-
-// ══════════════════════════════════════════════
-//  TEAM
-// ══════════════════════════════════════════════
-async function loadTeam(){
-  const cont=document.getElementById('team-cont');
-  cont.innerHTML='<div class="loading">⏳ กำลังโหลด...</div>';
-  const[{data:teams},{data:mems}]=await Promise.all([sb.from('teams').select('*').order('created_at'),sb.from('team_members').select('*').order('created_at')]);
-  if(!teams?.length){cont.innerHTML=`<div class="team-tabs"><button class="team-new-btn" onclick="openTeamModal()">+ สร้างทีมแรก</button></div><div class="empty">ยังไม่มีทีมครับ กด "+ สร้างทีมแรก" ได้เลย 👥</div>`;return;}
-  if(!currentTeamId||!teams.find(t=>t.id===currentTeamId))currentTeamId=teams[0].id;
-
-  let tabs=`<div class="team-tabs">`;
-  teams.forEach(t=>{
-    const cnt=mems?.filter(m=>m.team_id===t.id).length||0;
-    tabs+=`<div class="team-tab ${t.id===currentTeamId?'active':''}" onclick="switchTeam(${t.id})"><div class="team-dot" style="background:${t.color}"></div><span>${esc(t.name)}</span><span style="opacity:.7;font-size:11px">(${cnt})</span><button class="team-tab-btn" onclick="event.stopPropagation();openTeamModal(${t.id})">✏️</button><button class="team-tab-btn" onclick="event.stopPropagation();delTeam(${t.id})">🗑️</button></div>`;
-  });
-  tabs+=`<button class="team-new-btn" onclick="openTeamModal()">+ ทีมใหม่</button></div>`;
-
-  const tm=mems?.filter(m=>m.team_id===currentTeamId)||[];
-  const leaders=tm.filter(m=>m.member_type==='leader');
-  const members=tm.filter(m=>m.member_type!=='leader');
-  let body='';
-  if(leaders.length)body+=`<div class="section-title">👑 Team Leaders</div><div class="member-grid">${leaders.map(m=>mCardHTML(m)).join('')}</div>`;
-  if(members.length)body+=`<div class="section-title">👤 Members</div><div class="member-grid">${members.map(m=>mCardHTML(m)).join('')}</div>`;
-  if(!tm.length)body=`<div class="empty">ยังไม่มีสมาชิกในทีมนี้ครับ กด "+ เพิ่มสมาชิก" ได้เลย</div>`;
-  cont.innerHTML=tabs+body;
-}
-
-function mCardHTML(m){
-  const init=(m.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const bg=AV_COLORS[m.id%AV_COLORS.length];
-  return `<div class="member-card ${m.member_type==='leader'?'leader':''}">
-    ${m.member_type==='leader'?'<span class="leader-crown">👑</span>':''}
-    <div class="member-av" style="background:${bg}22;color:${bg}">${init}</div>
-    <div class="member-name">${esc(m.name||'สมาชิก')}</div>
-    <div class="member-role">${esc(m.role_title||'')}</div>
-    <span class="type-badge ${m.member_type==='leader'?'type-leader':'type-member'}">${m.member_type==='leader'?'⭐ Leader':'👤 Member'}</span>
-    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="editMember(${m.id})">✏️</button>
-      <button class="btn btn-ghost btn-sm" title="${m.member_type==='leader'?'เปลี่ยนเป็น Member':'เปลี่ยนเป็น Leader'}" onclick="toggleLeader(${m.id},'${m.member_type}')">${m.member_type==='leader'?'👤':'👑'}</button>
-      <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="delMember(${m.id})">🗑️</button>
-    </div>
-  </div>`;
-}
-
-function switchTeam(id){currentTeamId=id;loadTeam();}
-
-async function toggleLeader(id,cur){
-  await sb.from('team_members').update({member_type:cur==='leader'?'member':'leader'}).eq('id',id);
-  loadTeam();
-}
-
-async function delMember(id){
-  if(!confirm('ลบสมาชิกคนนี้?'))return;
-  await sb.from('team_members').delete().eq('id',id);
-  loadTeam();
-}
-
-async function openMemModal(id){
-  const{data:teams}=await sb.from('teams').select('*');
-  document.getElementById('mm-team').innerHTML=teams?.map(t=>`<option value="${t.id}" ${t.id===currentTeamId?'selected':''}>${esc(t.name)}</option>`).join('')||'<option>ยังไม่มีทีม</option>';
-  document.getElementById('e-mem-id').value='';
-  document.getElementById('mm-name').value='';
-  document.getElementById('mm-role').value='';
-  document.getElementById('mm-type').value='member';
-  document.getElementById('m-mem-title').textContent='เพิ่มสมาชิก';
-  openM('m-member');
-}
-
-async function editMember(id){
-  const{data:m}=await sb.from('team_members').select('*').eq('id',id).single();
-  if(!m)return;
-  await openMemModal();
-  document.getElementById('e-mem-id').value=id;
-  document.getElementById('mm-name').value=m.name||'';
-  document.getElementById('mm-role').value=m.role_title||'';
-  document.getElementById('mm-team').value=m.team_id;
-  document.getElementById('mm-type').value=m.member_type||'member';
-  document.getElementById('m-mem-title').textContent='แก้ไขสมาชิก';
-}
-
-async function saveMember(){
-  const name=document.getElementById('mm-name').value.trim();
-  if(!name)return alert('กรุณากรอกชื่อ');
-  const editId=document.getElementById('e-mem-id').value;
-  const data={name,role_title:document.getElementById('mm-role').value,team_id:parseInt(document.getElementById('mm-team').value),member_type:document.getElementById('mm-type').value};
-  if(editId){await sb.from('team_members').update(data).eq('id',editId);}
-  else{data.created_by=currentUser.id;const{error}=await sb.from('team_members').insert(data);if(!error)await sb.from('activities').insert({text:`เพิ่มสมาชิก "${name}"`,created_by:currentUser.id});}
-  closeM('m-member');loadTeam();
-}
-
-async function openTeamModal(id){
-  document.getElementById('e-team-id').value=id||'';
-  document.getElementById('tm-name').value='';
-  document.getElementById('m-team-title').textContent=id?'แก้ไขทีม':'สร้างทีมใหม่';
-  let sel=TEAM_COLORS[0];
-  if(id){const{data:t}=await sb.from('teams').select('*').eq('id',id).single();if(t){document.getElementById('tm-name').value=t.name;sel=t.color;}}
-  const pick=document.getElementById('color-pick');
-  pick.innerHTML=TEAM_COLORS.map(c=>`<div class="color-swatch ${c===sel?'selected':''}" style="background:${c}" onclick="pickColor('${c}')"></div>`).join('');
-  document.getElementById('tm-color').value=sel;
-  openM('m-team');
-}
-
-function pickColor(c){
-  document.getElementById('tm-color').value=c;
-  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('selected',s.style.background===c||s.style.backgroundColor===c));
-}
-
-async function saveTeam(){
-  const name=document.getElementById('tm-name').value.trim();
-  if(!name)return alert('กรุณากรอกชื่อทีม');
-  const color=document.getElementById('tm-color').value;
-  const editId=document.getElementById('e-team-id').value;
-  if(editId){await sb.from('teams').update({name,color}).eq('id',editId);}
-  else{const{data}=await sb.from('teams').insert({name,color,created_by:currentUser.id}).select().single();if(data)currentTeamId=data.id;}
-  closeM('m-team');loadTeam();
-}
-
-async function delTeam(id){
-  const{count}=await sb.from('teams').select('*',{count:'exact',head:true});
-  if(count<=1)return alert('ต้องมีอย่างน้อย 1 ทีมครับ');
-  if(!confirm('ลบทีมนี้? สมาชิกในทีมจะถูกลบด้วย'))return;
-  await sb.from('team_members').delete().eq('team_id',id);
-  await sb.from('teams').delete().eq('id',id);
-  currentTeamId=null;loadTeam();
-}
-
-// ══════════════════════════════════════════════
-//  UTILS
-// ══════════════════════════════════════════════
-function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
-
 /* ═══════════════ WORKLOAD ═══════════════ */
 let wlMembers=[], wlTasks=[], wlProjects=[], wlCapacities={};
 const WL_COLORS=['#6366f1','#ec4899','#f59e0b','#22c55e','#06b6d4','#8b5cf6','#ef4444','#10b981'];
@@ -3420,614 +3361,6 @@ function saveCapacity(){
   renderWorkload();
 }
 
-
-/* ════════════════════ REVIEW BOARD ════════════════════ */
-let rbData=[], rbProjects=[];
-const RB_STAGE_CFG = {
-  decision:{label:'Decision Made',color:'#166534',dot:'#22c55e'},
-  review:  {label:'Review & Recommendation',color:'#7c3aed',dot:'#a78bfa'},
-  planning:{label:'Planning',color:'#0369a1',dot:'#38bdf8'},
-  ideation:{label:'Ideation',color:'#92400e',dot:'#fbbf24'}
-};
-const RB_STAGE_ORDER = ['decision','review','planning','ideation'];
-const RB_GO_CFG = {
-  approved:{label:'Approved',cls:'rb-go-approved'},
-  rejected:{label:'Rejected',cls:'rb-go-rejected'},
-  pending: {label:'Pending', cls:'rb-go-pending'},
-  hold:    {label:'On Hold', cls:'rb-go-hold'}
-};
-const RB_RISK_CFG = {
-  low:     {label:'Low',     cls:'rb-risk-low'},
-  medium:  {label:'Medium',  cls:'rb-risk-medium'},
-  high:    {label:'High',    cls:'rb-risk-high'},
-  critical:{label:'Critical',cls:'rb-risk-critical'}
-};
-let rbCollapsed = {};
-
-async function loadReviewBoard(){
-  const [{data:rows},{data:projs}] = await Promise.all([
-    sb.from('analyses').select('*').order('created_at',{ascending:false}),
-    sb.from('projects').select('id,name').order('name')
-  ]);
-  rbData = rows || [];
-  rbProjects = projs || [];
-
-  // Populate project filter
-  const pf = document.getElementById('rb-filter-proj');
-  const cur = pf.value;
-  pf.innerHTML = '<option value="">📁 ทุก Project</option>' +
-    rbProjects.map(p=>`<option value="${p.id}" ${cur==p.id?'selected':''}>${p.name}</option>`).join('');
-
-  renderReviewBoard();
-}
-
-function renderReviewBoard(){
-  const search = (document.getElementById('rb-search')?.value||'').toLowerCase();
-  const fProj  = document.getElementById('rb-filter-proj')?.value||'';
-  const fGo    = document.getElementById('rb-filter-go')?.value||'';
-  const fRisk  = document.getElementById('rb-filter-risk')?.value||'';
-  const projMap = {}; rbProjects.forEach(p=>projMap[p.id]=p.name);
-
-  let rows = rbData;
-  if(search) rows = rows.filter(r=>r.name.toLowerCase().includes(search));
-  if(fProj)  rows = rows.filter(r=>r.project_id==fProj);
-  if(fGo)    rows = rows.filter(r=>r.go_no_go===fGo);
-  if(fRisk)  rows = rows.filter(r=>r.risk_level===fRisk);
-
-  // Group by stage
-  const groups = {};
-  RB_STAGE_ORDER.forEach(s=>{ groups[s] = rows.filter(r=>r.stage===s); });
-
-  const el = document.getElementById('rb-content');
-  if(!rows.length){ el.innerHTML='<div class="empty">ยังไม่มีข้อมูล กด "+ เพิ่ม Analysis" ได้เลยครับ</div>'; return; }
-
-  let html = '';
-  RB_STAGE_ORDER.forEach(stage => {
-    const grp = groups[stage];
-    if(!grp.length) return;
-    const cfg = RB_STAGE_CFG[stage];
-    const isOpen = !rbCollapsed[stage];
-    const totalHorizon = grp.reduce((s,r)=>s+(r.horizon||0),0);
-    const totalDiscount = grp.reduce((s,r)=>s+(r.discount_rate||0),0);
-
-    html += `<div class="rb-table-wrap" style="margin-bottom:16px;">
-      <table class="rb-table">
-        <thead>
-          <tr>
-            <th style="width:30px;"></th>
-            <th>TITLE</th>
-            <th style="width:110px;">Horizon (yrs)</th>
-            <th style="width:130px;">Stage</th>
-            <th style="width:110px;">Discount Rate</th>
-            <th style="width:120px;">Go/No-Go</th>
-            <th style="width:120px;">Risk Level</th>
-            <th style="width:160px;">Type</th>
-            <th style="width:60px;"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Group header row -->
-          <tr class="rb-group-row" onclick="rbToggle('${stage}')">
-            <td><span style="font-size:16px;">${isOpen?'▼':'▶'}</span></td>
-            <td colspan="8">
-              <div class="rb-group-label">
-                <div class="rb-group-dot" style="background:${cfg.dot}"></div>
-                <span style="color:${cfg.color}">${cfg.label}</span>
-                <span class="rb-group-count">${grp.length}</span>
-              </div>
-            </td>
-          </tr>`;
-
-    if(isOpen){
-      grp.forEach(r => {
-        const goC = RB_GO_CFG[r.go_no_go]||RB_GO_CFG.pending;
-        const riskC = RB_RISK_CFG[r.risk_level]||RB_RISK_CFG.medium;
-        const types = (r.type||[]).map(t=>`<span class="rb-type">${t}</span>`).join('');
-        const pName = projMap[r.project_id]||'';
-        html += `<tr>
-          <td><input type="checkbox" class="rb-cb"></td>
-          <td>
-            <div class="rb-name" onclick="editRb(${r.id})">${r.name}</div>
-            ${pName?`<div class="rb-proj">📁 ${pName}</div>`:''}
-          </td>
-          <td><span class="rb-horizon">${r.horizon??'—'}</span></td>
-          <td><span class="rb-badge rb-stage-${r.stage}">${cfg.label.split(' ')[0]}</span></td>
-          <td><span class="rb-discount">${r.discount_rate!=null?r.discount_rate+'%':'—'}</span></td>
-          <td><span class="rb-badge ${goC.cls}">${goC.label}</span></td>
-          <td><span class="rb-badge ${riskC.cls}">${riskC.label}</span></td>
-          <td>${types||'—'}</td>
-          <td>
-            <button class="rb-action-btn" onclick="editRb(${r.id})" title="แก้ไข">✏️</button>
-            <button class="rb-action-btn" onclick="delRb(${r.id})" title="ลบ" style="color:var(--danger)">🗑️</button>
-          </td>
-        </tr>`;
-      });
-
-      // Summary row
-      html += `<tr class="rb-summary-row">
-        <td></td>
-        <td></td>
-        <td style="font-weight:700;color:var(--text);">${totalHorizon} <small style="font-weight:400">sum</small></td>
-        <td></td>
-        <td style="font-weight:700;color:var(--text);">${totalDiscount} <small style="font-weight:400">sum</small></td>
-        <td colspan="4"></td>
-      </tr>`;
-
-      // Add row button
-      html += `<tr><td colspan="9">
-        <div class="rb-add-row" onclick="openRbModal(null,'${stage}')">+ Add analysis</div>
-      </td></tr>`;
-    }
-
-    html += `</tbody></table></div>`;
-  });
-
-  el.innerHTML = html;
-}
-
-function rbToggle(stage){ rbCollapsed[stage]=!rbCollapsed[stage]; renderReviewBoard(); }
-
-function openRbModal(id=null, defaultStage=null){
-  document.getElementById('rb-edit-id').value = '';
-  document.getElementById('rb-name').value = '';
-  document.getElementById('rb-stage').value = defaultStage||'planning';
-  document.getElementById('rb-go').value = 'pending';
-  document.getElementById('rb-risk').value = 'medium';
-  document.getElementById('rb-horizon').value = '';
-  document.getElementById('rb-discount').value = '';
-  ['simple','tech','complex','comp'].forEach(t=>document.getElementById('rb-type-'+t).checked=false);
-
-  // Populate project select
-  const sel = document.getElementById('rb-proj');
-  sel.innerHTML = '<option value="">— ไม่ระบุ Project —</option>' +
-    rbProjects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-
-  document.getElementById('m-rb-title').textContent = '➕ เพิ่ม Analysis';
-  openM('m-rb');
-}
-
-async function editRb(id){
-  const r = rbData.find(x=>x.id===id);
-  if(!r) return;
-  document.getElementById('rb-edit-id').value = id;
-  document.getElementById('rb-name').value = r.name;
-
-  const sel = document.getElementById('rb-proj');
-  sel.innerHTML = '<option value="">— ไม่ระบุ Project —</option>' +
-    rbProjects.map(p=>`<option value="${p.id}" ${p.id==r.project_id?'selected':''}>${p.name}</option>`).join('');
-
-  document.getElementById('rb-stage').value = r.stage||'planning';
-  document.getElementById('rb-go').value = r.go_no_go||'pending';
-  document.getElementById('rb-risk').value = r.risk_level||'medium';
-  document.getElementById('rb-horizon').value = r.horizon??'';
-  document.getElementById('rb-discount').value = r.discount_rate??'';
-
-  const types = r.type||[];
-  document.getElementById('rb-type-simple').checked = types.includes('Simple');
-  document.getElementById('rb-type-tech').checked   = types.includes('Technical');
-  document.getElementById('rb-type-complex').checked= types.includes('Complex');
-  document.getElementById('rb-type-comp').checked   = types.includes('Compliance');
-
-  document.getElementById('m-rb-title').textContent = '✏️ แก้ไข Analysis';
-  openM('m-rb');
-}
-
-async function saveRb(){
-  const name = document.getElementById('rb-name').value.trim();
-  if(!name){ alert('กรุณาใส่ชื่อ Analysis'); return; }
-  const editId = document.getElementById('rb-edit-id').value;
-
-  const types = [];
-  if(document.getElementById('rb-type-simple').checked)  types.push('Simple');
-  if(document.getElementById('rb-type-tech').checked)    types.push('Technical');
-  if(document.getElementById('rb-type-complex').checked) types.push('Complex');
-  if(document.getElementById('rb-type-comp').checked)    types.push('Compliance');
-
-  const data = {
-    name,
-    project_id: parseInt(document.getElementById('rb-proj').value)||null,
-    stage:         document.getElementById('rb-stage').value,
-    go_no_go:      document.getElementById('rb-go').value,
-    risk_level:    document.getElementById('rb-risk').value,
-    horizon:       parseInt(document.getElementById('rb-horizon').value)||null,
-    discount_rate: parseFloat(document.getElementById('rb-discount').value)||null,
-    type: types
-  };
-
-  if(editId){
-    const{error}=await sb.from('analyses').update(data).eq('id',editId);
-    if(error){ alert('❌ บันทึกไม่สำเร็จ: '+error.message); return; }
-  } else {
-    data.created_by = currentUser.id;
-    const{error}=await sb.from('analyses').insert(data);
-    if(error){ alert('❌ เพิ่มไม่สำเร็จ: '+error.message); return; }
-  }
-  closeM('m-rb');
-  await loadReviewBoard();
-}
-
-async function delRb(id){
-  if(!confirm('ลบ Analysis นี้?')) return;
-  const{error}=await sb.from('analyses').delete().eq('id',id);
-  if(error){ alert('❌ ลบไม่สำเร็จ: '+error.message); return; }
-  await loadReviewBoard();
-}
-
-
-/* ════════════════════ 4-LAYER HIERARCHY ════════════════════ */
-
-// Group Modal
-/* ── PROJECT GROUPS STATE ── */
-let pgData=[], pgCollapsed={};
-const PG_COLORS=['#6366f1','#ec4899','#f59e0b','#22c55e','#06b6d4','#8b5cf6','#ef4444','#10b981'];
-
-let pgSelColor='#6366f1';
-function openGroupModal(id=null){
-  document.getElementById('grp-edit-id').value=id||'';
-  document.getElementById('grp-name').value='';
-  pgSelColor='#6366f1';
-  const pick=document.getElementById('grp-color-pick');
-  pick.innerHTML=PG_COLORS.map(c=>`<div class="color-swatch ${c===pgSelColor?'selected':''}" style="background:${c}" onclick="pickGroupColor('${c}')"></div>`).join('');
-  document.getElementById('grp-color').value=pgSelColor;
-  document.getElementById('m-group-title').textContent=id?'✏️ แก้ไขกลุ่มงาน':'➕ สร้างกลุ่มงาน';
-  if(id){
-    const gr=pgData.find(g=>g.id===id);
-    if(gr){document.getElementById('grp-name').value=gr.name;pgSelColor=gr.color;document.getElementById('grp-color').value=gr.color;pick.innerHTML=PG_COLORS.map(c=>`<div class="color-swatch ${c===gr.color?'selected':''}" style="background:${c}" onclick="pickGroupColor('${c}')"></div>`).join('');}
-  }
-  openM('m-group');
-}
-function pickGroupColor(c){pgSelColor=c;document.getElementById('grp-color').value=c;document.querySelectorAll('#grp-color-pick .color-swatch').forEach(s=>s.classList.toggle('selected',s.style.background===c));}
-async function saveGroup(){
-  const name=document.getElementById('grp-name').value.trim();
-  if(!name){alert('กรุณาใส่ชื่อกลุ่มงาน');return;}
-  const editId=document.getElementById('grp-edit-id').value;
-  const data={name,color:document.getElementById('grp-color').value||'#6366f1'};
-  if(editId){await sb.from('project_groups').update(data).eq('id',editId);}
-  else{data.created_by=currentUser.id;await sb.from('project_groups').insert(data);}
-  closeM('m-group');loadProjects();
-}
-async function delGroup(id){
-  if(!confirm('ลบกลุ่มนี้? (Projects ในกลุ่มจะยังอยู่ แต่ไม่ระบุกลุ่ม)'))return;
-  await sb.from('projects').update({group_id:null}).eq('group_id',id);
-  await sb.from('project_groups').delete().eq('id',id);
-  loadProjects();
-}
-
-/* ── SUBTASKS ── */
-let stData={}, stExpanded={}, stMembers=[];
-
-async function loadSubtasksForTask(taskId){
-  const{data}=await sb.from('subtasks').select('*').eq('task_id',taskId).order('created_at');
-  stData[taskId]=data||[];
-  return data||[];
-}
-
-function subtaskHTML(taskId){
-  const subs=stData[taskId]||[];
-  const done=subs.filter(s=>s.status==='done').length;
-  const pct=subs.length?Math.round(done/subs.length*100):0;
-  return `<div class="subtask-section">
-    ${subs.length?`<div class="subtask-progress"><div class="subtask-progress-fill" style="width:${pct}%"></div></div>
-    <div class="subtask-counter">${done}/${subs.length} subtasks เสร็จแล้ว</div>`:''}
-    ${subs.map(s=>`<div class="subtask-row" id="st-row-${s.id}">
-      <input type="checkbox" class="subtask-cb" ${s.status==='done'?'checked':''} onchange="toggleSubtask(${s.id},${taskId},this.checked)">
-      <span class="subtask-name ${s.status==='done'?'done':''}">${esc(s.name)}</span>
-      ${s.due_date?`<span class="subtask-due">📅 ${s.due_date}</span>`:''}
-      <button class="subtask-del" onclick="delSubtask(${s.id},${taskId})">✕</button>
-    </div>`).join('')}
-    <div class="subtask-add-row">
-      <input class="subtask-add-input" id="st-input-${taskId}" placeholder="+ เพิ่มงานย่อย..." onkeydown="if(event.key==='Enter')quickAddSubtask(${taskId})">
-      <button class="subtask-add-btn" onclick="quickAddSubtask(${taskId})">เพิ่ม</button>
-    </div>
-  </div>`;
-}
-
-async function toggleTaskExpand(taskId, btn){
-  if(stExpanded[taskId]){
-    stExpanded[taskId]=false;
-    btn.classList.remove('open');
-    const el=document.getElementById('subtask-row-'+taskId);
-    if(el)el.remove();
-  } else {
-    stExpanded[taskId]=true;
-    btn.classList.add('open');
-    await loadSubtasksForTask(taskId);
-    const row=document.getElementById('task-row-'+taskId);
-    if(row){
-      const tr=document.createElement('tr');
-      tr.id='subtask-row-'+taskId;
-      tr.innerHTML=`<td colspan="10" style="padding:0 0 6px 56px;border-bottom:1px solid var(--border);"><div id="subtask-area-${taskId}" style="border-left:3px solid var(--primary);padding-left:12px;margin:4px 0;"></div></td>`;
-      row.after(tr);
-      document.getElementById('subtask-area-'+taskId).innerHTML=subtaskHTML(taskId);
-    }
-  }
-}
-
-async function quickAddSubtask(taskId){
-  const inp=document.getElementById('st-input-'+taskId);
-  const name=inp?.value.trim();
-  if(!name)return;
-  const{error}=await sb.from('subtasks').insert({name,task_id:taskId,status:'todo',created_by:currentUser.id});
-  if(error){alert('❌ เพิ่ม Subtask ไม่สำเร็จ: '+error.message);return;}
-  inp.value='';
-  await loadSubtasksForTask(taskId);
-  const area=document.getElementById('subtask-area-'+taskId);
-  if(area)area.innerHTML=subtaskHTML(taskId);
-}
-
-async function toggleSubtask(stId,taskId,done){
-  await sb.from('subtasks').update({status:done?'done':'todo'}).eq('id',stId);
-  await loadSubtasksForTask(taskId);
-  const area=document.getElementById('subtask-area-'+taskId);
-  if(area)area.innerHTML=subtaskHTML(taskId);
-}
-
-async function delSubtask(stId,taskId){
-  if(!confirm('ลบงานย่อยนี้?'))return;
-  await sb.from('subtasks').delete().eq('id',stId);
-  await loadSubtasksForTask(taskId);
-  const area=document.getElementById('subtask-area-'+taskId);
-  if(area)area.innerHTML=subtaskHTML(taskId);
-}
-
-
-// ══════════════════════════════════════════════
-//  NOTIFICATIONS
-// ══════════════════════════════════════════════
-let _notifOpen = false;
-let _notifData = [];
-
-async function checkNotifications(){
-  const today = new Date(); today.setHours(0,0,0,0);
-  const soon = new Date(today); soon.setDate(today.getDate()+3);
-  const fmt = d => d.toISOString().split('T')[0];
-  const {data:tasks} = await sb.from('tasks').select('id,name,due_date,status,assignee_id').neq('status','done').lte('due_date',fmt(soon)).not('due_date','is',null).order('due_date');
-  _notifData = (tasks||[]).map(t=>{
-    const due=new Date(t.due_date); due.setHours(0,0,0,0);
-    const diff=Math.round((due-today)/86400000);
-    return {...t,diff};
-  });
-  const badge=document.getElementById('notif-badge');
-  if(badge){
-    badge.textContent=_notifData.length;
-    badge.style.display=_notifData.length?'flex':'none';
-  }
-}
-
-function toggleNotifPanel(){
-  const panel=document.getElementById('notif-panel');
-  _notifOpen=!_notifOpen;
-  panel.style.display=_notifOpen?'block':'none';
-  if(_notifOpen)renderNotifList();
-}
-
-function renderNotifList(){
-  const el=document.getElementById('notif-list');
-  if(!_notifData.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">✅ ไม่มีงานที่ต้องแจ้งเตือน</div>';return;}
-  el.innerHTML=_notifData.map(t=>{
-    const isOver=t.diff<0;
-    const label=isOver?`⚠ เกินกำหนด ${Math.abs(t.diff)} วัน`:(t.diff===0?'🔴 ครบกำหนดวันนี้':`🟡 อีก ${t.diff} วัน`);
-    const dot=isOver?'warn':'';
-    return `<div class="notif-item unread" onclick="searchNavTo('tasks')">
-      <div class="notif-dot ${dot}"></div>
-      <div><div style="font-size:13px;font-weight:600;color:var(--text);">${esc(t.name)}</div>
-      <div style="font-size:11px;color:${isOver?'#ef4444':'#f59e0b'};margin-top:2px;">${label} · กำหนดส่ง ${t.due_date}</div></div>
-    </div>`;
-  }).join('');
-}
-
-function markAllRead(){
-  _notifData=[];
-  const badge=document.getElementById('notif-badge');
-  if(badge)badge.style.display='none';
-  renderNotifList();
-}
-
-document.addEventListener('click',function(e){
-  if(_notifOpen&&!e.target.closest('.notif-wrap')){
-    _notifOpen=false;
-    const p=document.getElementById('notif-panel');
-    if(p)p.style.display='none';
-  }
-});
-
-// ══════════════════════════════════════════════
-//  TASK DETAIL TABS (comments + files)
-// ══════════════════════════════════════════════
-function switchTaskTab(tab){
-  document.getElementById('tab-comments-btn').classList.toggle('active',tab==='comments');
-  document.getElementById('tab-files-btn').classList.toggle('active',tab==='files');
-  document.getElementById('tab-comments-panel').style.display=tab==='comments'?'block':'none';
-  document.getElementById('tab-files-panel').style.display=tab==='files'?'block':'none';
-}
-
-// ── Comments ──
-async function loadTaskComments(taskId){
-  const {data:rows}=await sb.from('task_comments').select('*').eq('task_id',taskId).order('created_at');
-  const el=document.getElementById('t-comments-list');
-  if(!el)return;
-  if(!rows||!rows.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px;">ยังไม่มี comment</div>';return;}
-  el.innerHTML=rows.map(c=>`<div class="comment-row">
-    <div class="comment-meta">👤 ${esc(c.user_name||'User')} · ${new Date(c.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</div>
-    <div class="comment-text">${esc(c.text)}</div>
-  </div>`).join('');
-  el.scrollTop=el.scrollHeight;
-}
-
-async function addTaskComment(){
-  const taskId=document.getElementById('e-task-id').value;
-  if(!taskId)return;
-  const inp=document.getElementById('t-comment-input');
-  const text=inp.value.trim();
-  if(!text)return;
-  const name=currentUser?.user_metadata?.name||currentUser?.email?.split('@')[0]||'User';
-  await sb.from('task_comments').insert({task_id:parseInt(taskId),user_id:currentUser.id,user_name:name,text});
-  inp.value='';
-  loadTaskComments(taskId);
-}
-
-// ── File Attachments ──
-async function loadTaskAttachments(taskId){
-  const {data:rows}=await sb.from('task_attachments').select('*').eq('task_id',taskId).order('created_at');
-  const el=document.getElementById('t-files-list');
-  if(!el)return;
-  if(!rows||!rows.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px;">ยังไม่มีไฟล์แนบ</div>';return;}
-  el.innerHTML=rows.map(f=>{
-    const ext=(f.file_name.split('.').pop()||'').toLowerCase();
-    const icon={'pdf':'📄','png':'🖼️','jpg':'🖼️','jpeg':'🖼️','gif':'🖼️','xlsx':'📊','xls':'📊','csv':'📊','docx':'📝','doc':'📝','zip':'📦','rar':'📦'}[ext]||'📁';
-    const kb=f.file_size?`${Math.round(f.file_size/1024)} KB`:'';
-    return `<div class="file-row">
-      <span class="file-icon">${icon}</span>
-      <div class="file-info">
-        <a class="file-name" href="${f.file_url}" target="_blank" title="${esc(f.file_name)}">${esc(f.file_name)}</a>
-        ${kb?`<span class="file-size">${kb}</span>`:''}
-      </div>
-      <button onclick="delTaskAttachment(${f.id},'${f.file_url}')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:14px;padding:2px 6px;" title="ลบ">🗑</button>
-    </div>`;
-  }).join('');
-}
-
-async function uploadTaskFiles(){
-  const taskId=document.getElementById('e-task-id').value;
-  if(!taskId){alert('กรุณาบันทึก Task ก่อนอัพโหลดไฟล์');return;}
-  const inp=document.getElementById('t-file-input');
-  const files=[...inp.files];
-  if(!files.length){alert('กรุณาเลือกไฟล์');return;}
-  const btn=inp.nextElementSibling;
-  btn.textContent='กำลังอัพโหลด...';btn.disabled=true;
-  let uploaded=0;
-  for(const file of files){
-    if(file.size>5*1024*1024){alert(file.name+' ใหญ่เกิน 5MB');continue;}
-    const path=`task-${taskId}/${Date.now()}-${file.name}`;
-    const {data:up,error:upErr}=await sb.storage.from('task-files').upload(path,file,{cacheControl:'3600',upsert:false});
-    if(upErr){console.error('upload error',upErr);alert('อัพโหลดไม่สำเร็จ: '+upErr.message);continue;}
-    const {data:urlData}=sb.storage.from('task-files').getPublicUrl(path);
-    await sb.from('task_attachments').insert({task_id:parseInt(taskId),file_name:file.name,file_url:urlData.publicUrl,file_size:file.size});
-    uploaded++;
-  }
-  btn.textContent='อัพโหลด';btn.disabled=false;
-  inp.value='';
-  if(uploaded)loadTaskAttachments(taskId);
-}
-
-async function delTaskAttachment(id,url){
-  if(!confirm('ลบไฟล์นี้?'))return;
-  // Extract path from URL for storage deletion
-  try{
-    const u=new URL(url);
-    const parts=u.pathname.split('/task-files/');
-    if(parts[1])await sb.storage.from('task-files').remove([parts[1]]);
-  }catch(e){}
-  await sb.from('task_attachments').delete().eq('id',id);
-  const taskId=document.getElementById('e-task-id').value;
-  if(taskId)loadTaskAttachments(taskId);
-}
-
-// ══════════════════════════════════════════════
-//  DEPENDENCY helpers
-// ══════════════════════════════════════════════
-async function loadDependsOptions(currentTaskId){
-  const sel=document.getElementById('t-depends');
-  if(!sel)return;
-  const {data:tasks}=await sb.from('tasks').select('id,name').order('name');
-  sel.innerHTML='<option value="">-- ไม่มี --</option>';
-  (tasks||[]).filter(t=>t.id!==parseInt(currentTaskId||0)).forEach(t=>{
-    sel.innerHTML+=`<option value="${t.id}">${esc(t.name)}</option>`;
-  });
-}
-
-
-
-// ═══════════════════════════════════════════════════════════════
-// PRODUCTION STAGE BOARD
-// ═══════════════════════════════════════════════════════════════
-const PROD_STAGES = [
-  { key:'raw_material',   label:'Raw Material',   color:'#94a3b8' },
-  { key:'procurement',    label:'Procurement',    color:'#6366f1' },
-  { key:'machining',      label:'Machining/CNC',  color:'#f97316' },
-  { key:'heat_treatment', label:'Heat/Surface',   color:'#ef4444' },
-  { key:'assembly',       label:'Assembly',       color:'#f59e0b' },
-  { key:'qc_inspection',  label:'QC/Inspection',  color:'#10b981' },
-  { key:'delivery',       label:'Delivery',       color:'#0891b2' },
-];
-
-async function loadProduction(){
-  const board = document.getElementById('prod-board');
-  if(!board) return;
-  // Populate project filter
-  const sel = document.getElementById('prod-proj-filter');
-  if(sel && sel.options.length <= 1){
-    try{
-      const {data:projs} = await sb.from('projects').select('id,name').eq('status','active').order('name');
-      if(projs) projs.forEach(p=>{
-        const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o);
-      });
-    }catch(e){}
-  }
-  const projFilter = sel ? sel.value : '';
-  try{
-    let q = sb.from('tasks').select('id,name,production_stage,status,project_id,projects(name),assignee_id,team_members(name)').neq('status','done');
-    if(projFilter) q = q.eq('project_id', projFilter);
-    const {data:tasks,error} = await q.order('name');
-    if(error){board.innerHTML='<div style="color:#ef4444;padding:20px;">Error: '+error.message+'</div>';return;}
-    const grouped={};
-    PROD_STAGES.forEach(s=>{ grouped[s.key]=[]; });
-    grouped['backlog']=[];
-    (tasks||[]).forEach(t=>{
-      const stage = t.production_stage||'backlog';
-      if(!grouped[stage]) grouped[stage]=[];
-      grouped[stage].push(t);
-    });
-    const stagesShown = [{key:'backlog',label:'Backlog',color:'#64748b'}, ...PROD_STAGES];
-    let html = '<div class="prod-board">';
-    stagesShown.forEach(st=>{
-      const cards=(grouped[st.key]||[]);
-      html += `<div class="prod-col" id="pcol-${st.key}">
-        <div class="prod-col-head" style="border-bottom-color:${st.color};color:${st.color};">
-          <span>${st.label}</span>
-          <span style="background:${st.color};color:#fff;border-radius:12px;padding:1px 7px;font-size:10px;">${cards.length}</span>
-        </div>
-        <div class="prod-col-body" id="pcbody-${st.key}" ondragover="event.preventDefault();this.classList.add('drag-over');" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('drag-over');" ondrop="dropProdCard(event,'${st.key}')">`;
-      if(cards.length===0){
-        html += `<div style="color:var(--text-muted);font-size:11px;text-align:center;padding:12px 0;opacity:.6;">— ว่าง —</div>`;
-      } else {
-        cards.forEach(t=>{
-          const assignee = t.team_members ? (Array.isArray(t.team_members)?t.team_members[0]?.name:t.team_members.name)||'' : '';
-          const proj = t.projects ? (Array.isArray(t.projects)?t.projects[0]?.name:t.projects.name)||'' : '';
-          html += `<div class="prod-card" draggable="true" id="pcard-${t.id}"
-            ondragstart="this.classList.add('dragging');event.dataTransfer.setData('taskId','${t.id}');event.dataTransfer.setData('fromStage','${st.key}');" ondragend="document.querySelectorAll('.prod-card.dragging').forEach(c=>c.classList.remove('dragging'));"
-            onclick="openTaskFromProd(${t.id})">
-            <div class="prod-card-title">${t.name}</div>
-            <div class="prod-card-proj">${proj}</div>
-            ${assignee?`<div class="prod-card-assign">👤 ${assignee}</div>`:''}
-          </div>`;
-        });
-      }
-      html += `</div></div>`;
-    });
-    html += '</div>';
-    board.innerHTML = html;
-  }catch(e){board.innerHTML='<div style="color:#ef4444;padding:20px;">Error: '+e.message+'</div>';}
-}
-
-async function dropProdCard(e, toStage){
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-  document.querySelectorAll('.prod-card.dragging').forEach(c=>c.classList.remove('dragging'));
-  const taskId = e.dataTransfer.getData('taskId');
-  if(!taskId) return;
-  try{
-    await sb.from('tasks').update({production_stage:toStage}).eq('id',taskId);
-    loadProduction();
-  }catch(err){ alert('Error: '+err.message); }
-}
-
-function openTaskFromProd(taskId){
-  // Navigate to tasks and open task
-  const navEl = document.querySelector('.nav-item[onclick*="tasks"]');
-  showPage('tasks', navEl);
-  setTimeout(()=>{ openTask(taskId); }, 400);
-}
 
 // ═══════════════════════════════════════════════════════════════
 // QC RECORDS
@@ -4244,6 +3577,7 @@ const PROJECT_TEMPLATES = [
     name:'Jig & Fixture Standard',
     desc:'12 ขั้นตอนครบ: RFQ → Design → Mfg → QC → Delivery',
     badge:'Recommended',
+    category:'jig',
     tasks:[
       {name:'รับ RFQ + วิเคราะห์ความเป็นไปได้',  status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog', days:[0,2]},
       {name:'ส่ง Quotation + รอ PO',              status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog', days:[2,5]},
@@ -4266,6 +3600,7 @@ const PROJECT_TEMPLATES = [
     name:'Quick Jig (Simple)',
     desc:'สำหรับ Jig เล็ก ใช้เวลาสั้น (4-6 สัปดาห์)',
     badge:'',
+    category:'jig',
     tasks:[
       {name:'รับ RFQ + เสนอราคา',                 status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[0,3]},
       {name:'ออกแบบ 3D + 2D Drawing',             status:'todo', priority:'high',   tag:'design', production_stage:'backlog',   days:[3,10]},
@@ -4280,6 +3615,7 @@ const PROJECT_TEMPLATES = [
     name:'Welding Fixture (Automotive)',
     desc:'Fixture สำหรับงาน Welding ชิ้นส่วนรถยนต์',
     badge:'',
+    category:'jig',
     tasks:[
       {name:'รับ Part Drawing + วิเคราะห์',        status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[0,3]},
       {name:'PFMEA + DFM Review',                  status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[3,7]},
@@ -4299,6 +3635,7 @@ const PROJECT_TEMPLATES = [
     name:'Checking Gauge / Inspection Jig',
     desc:'สำหรับ Gauge / Inspection fixture วัดชิ้นงาน',
     badge:'',
+    category:'jig',
     tasks:[
       {name:'รับ Gauge Design Spec + RFQ',         status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',   days:[0,2]},
       {name:'3D CAD Design (Gauge)',                status:'todo', priority:'high',   tag:'design', production_stage:'backlog',   days:[2,10]},
@@ -4311,18 +3648,107 @@ const PROJECT_TEMPLATES = [
       {name:'Delivery + Calibration Certificate',  status:'todo', priority:'high',   tag:'docs',   production_stage:'delivery',  days:[42,44]},
     ]
   },
+  // ═══════════════════ AUTOMATION TEMPLATES ═══════════════════
+  {
+    id:'auto_robot',
+    name:'🤖 Robotic Cell / Robot Integration',
+    desc:'ระบบ Robot: Pick & Place, Welding, Assembly (8-14 สัปดาห์)',
+    badge:'Automation',
+    category:'automation',
+    tasks:[
+      {name:'รับ RFQ + วิเคราะห์ Spec & Cycle Time',       status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[0,3]},
+      {name:'Quotation + Robot Selection (Brand/Model)',    status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[3,7]},
+      {name:'Project Kickoff + Safety Risk Assessment',     status:'todo', priority:'high',   tag:'feature',production_stage:'backlog',       days:[7,9]},
+      {name:'System Layout + Robot Reach Study',            status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[9,18]},
+      {name:'Electrical & Pneumatic Diagram',               status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[14,22]},
+      {name:'Safety Zone & Light Curtain Design (ISO 13849)',status:'todo',priority:'high',   tag:'design', production_stage:'backlog',       days:[18,24]},
+      {name:'BOM + Procurement (Robot, Controller, Tools)', status:'todo', priority:'medium', tag:'feature',production_stage:'procurement',   days:[22,30]},
+      {name:'Panel Build + Wiring',                         status:'todo', priority:'medium', tag:'feature',production_stage:'machining',     days:[30,42]},
+      {name:'Robot Program + End Effector Setup',           status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[38,52]},
+      {name:'HMI / PLC Program (Safety Logic)',             status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[44,54]},
+      {name:'FAT — Factory Acceptance Test',                status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[54,58]},
+      {name:'Site Installation + Commissioning',            status:'todo', priority:'high',   tag:'feature',production_stage:'delivery',      days:[58,64]},
+      {name:'SAT — Site Acceptance Test + Customer Sign',   status:'todo', priority:'high',   tag:'test',   production_stage:'delivery',      days:[64,68]},
+      {name:'Training + Manual + Handover',                 status:'todo', priority:'medium', tag:'docs',   production_stage:'delivery',      days:[68,72]},
+    ]
+  },
+  {
+    id:'auto_conveyor',
+    name:'🏭 Conveyor / Material Handling System',
+    desc:'ระบบสายพาน ลำเลียงวัสดุอัตโนมัติ (6-10 สัปดาห์)',
+    badge:'Automation',
+    category:'automation',
+    tasks:[
+      {name:'รับ RFQ + วิเคราะห์ Layout & Load Capacity',  status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[0,3]},
+      {name:'Quotation + Motor/Drive Selection',            status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[3,6]},
+      {name:'Mechanical Design (Frame, Belt, Roller)',      status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[6,16]},
+      {name:'Electrical Diagram + VFD/Sensor Spec',         status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[12,20]},
+      {name:'BOM + Procurement (Motor, Belt, Sensor)',      status:'todo', priority:'medium', tag:'feature',production_stage:'procurement',   days:[18,25]},
+      {name:'Fabrication + Machining (Frame)',              status:'todo', priority:'medium', tag:'feature',production_stage:'machining',     days:[24,36]},
+      {name:'Panel Build + Wiring + Sensor Install',        status:'todo', priority:'medium', tag:'feature',production_stage:'assembly',      days:[34,44]},
+      {name:'PLC Program (Speed Control, Safety Stop)',     status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[40,48]},
+      {name:'FAT — Run Test + Load Test',                   status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[48,52]},
+      {name:'Site Installation + Alignment',                status:'todo', priority:'high',   tag:'feature',production_stage:'delivery',      days:[52,57]},
+      {name:'SAT + Customer Approval + Handover',           status:'todo', priority:'high',   tag:'docs',   production_stage:'delivery',      days:[57,62]},
+    ]
+  },
+  {
+    id:'auto_plc',
+    name:'⚡ PLC / Machine Control System',
+    desc:'ระบบควบคุมเครื่องจักร PLC, HMI, SCADA (5-8 สัปดาห์)',
+    badge:'Automation',
+    category:'automation',
+    tasks:[
+      {name:'รับ RFQ + วิเคราะห์ I/O List & Control Logic', status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[0,3]},
+      {name:'Quotation + PLC/HMI Brand Selection',           status:'todo', priority:'high',   tag:'docs',   production_stage:'backlog',       days:[3,6]},
+      {name:'System Architecture + I/O Diagram',             status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[6,12]},
+      {name:'Electrical Panel Design + Wiring Diagram',      status:'todo', priority:'high',   tag:'design', production_stage:'backlog',       days:[10,18]},
+      {name:'BOM + Procurement (PLC, HMI, Sensors, VFD)',   status:'todo', priority:'medium', tag:'feature',production_stage:'procurement',   days:[15,22]},
+      {name:'Panel Build + Wiring + Cable Labeling',         status:'todo', priority:'medium', tag:'feature',production_stage:'machining',     days:[20,30]},
+      {name:'PLC Programming (Ladder / FBD)',                status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[25,36]},
+      {name:'HMI Screen Design + Alarm Setup',               status:'todo', priority:'high',   tag:'feature',production_stage:'assembly',      days:[30,38]},
+      {name:'Bench Test + I/O Verification',                 status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[36,40]},
+      {name:'FAT — Full Function Test + Customer Witness',   status:'todo', priority:'high',   tag:'test',   production_stage:'qc_inspection', days:[40,44]},
+      {name:'Site Installation + Commissioning',             status:'todo', priority:'high',   tag:'feature',production_stage:'delivery',      days:[44,50]},
+      {name:'SAT + Training + Manual Handover',              status:'todo', priority:'high',   tag:'docs',   production_stage:'delivery',      days:[50,54]},
+    ]
+  },
 ];
 
 function openTemplateModal(){
-  const list=document.getElementById('template-list');
-  list.innerHTML=PROJECT_TEMPLATES.map(t=>`
-    <div class="tmpl-card" id="tmpl-${t.id}" onclick="selectTemplate('${t.id}')">
-      ${t.badge?`<div class="tmpl-badge">${t.badge}</div>`:''}
-      <div class="tmpl-card-title">${t.name}</div>
-      <div class="tmpl-card-desc">${t.desc}</div>
-      <div style="font-size:10px;color:var(--primary);margin-top:6px;font-weight:600;">${t.tasks.length} Tasks</div>
+  const jigTemplates  = PROJECT_TEMPLATES.filter(t => t.category === 'jig');
+  const autoTemplates = PROJECT_TEMPLATES.filter(t => t.category === 'automation');
+
+  function renderCards(templates){
+    return templates.map(t=>`
+      <div class="tmpl-card" id="tmpl-${t.id}" onclick="selectTemplate('${t.id}')">
+        ${t.badge ? `<div class="tmpl-badge" style="${t.category==='automation'?'background:#f59e0b;color:#fff;':''}">${t.badge}</div>` : ''}
+        <div class="tmpl-card-title">${t.name}</div>
+        <div class="tmpl-card-desc">${t.desc}</div>
+        <div style="font-size:10px;color:var(--primary);margin-top:6px;font-weight:600;">${t.tasks.length} Tasks</div>
+      </div>
+    `).join('');
+  }
+
+  const list = document.getElementById('template-list');
+  list.innerHTML = `
+    <div style="margin-bottom:18px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+                  color:#6366f1;background:#eef2ff;border-left:3px solid #6366f1;
+                  padding:6px 12px;border-radius:6px;margin-bottom:10px;">
+        🔧 Jig &amp; Fixture
+      </div>
+      <div class="template-grid">${renderCards(jigTemplates)}</div>
     </div>
-  `).join('');
+    <div>
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+                  color:#f59e0b;background:#fffbeb;border-left:3px solid #f59e0b;
+                  padding:6px 12px;border-radius:6px;margin-bottom:10px;">
+        🤖 Automation
+      </div>
+      <div class="template-grid">${renderCards(autoTemplates)}</div>
+    </div>
+  `;
   document.getElementById('template-config').style.display='none';
   document.getElementById('tmpl-create-btn').style.display='none';
   document.getElementById('tmpl-proj-name').value='';
@@ -4400,6 +3826,338 @@ async function createProjectFromTemplate(){
   }
 }
 
+
+// ══════════════════════════════════════════════
+//  UTILITY
+// ══════════════════════════════════════════════
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ══════════════════════════════════════════════
+//  NOTIFICATIONS
+// ══════════════════════════════════════════════
+async function checkNotifications(){
+  if(!currentUser)return;
+  try{
+    const today=new Date();today.setHours(0,0,0,0);
+    const {data:tasks}=await sb.from('tasks').select('id,name,due_date,status').neq('status','done').not('due_date','is',null);
+    const overdue=(tasks||[]).filter(t=>t.due_date&&new Date(t.due_date)<today);
+    const badge=document.getElementById('notif-badge');
+    const list=document.getElementById('notif-list');
+    if(badge){badge.textContent=overdue.length;badge.style.display=overdue.length>0?'flex':'none';}
+    if(list){
+      list.innerHTML=overdue.length===0
+        ?'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">ไม่มีการแจ้งเตือน 🎉</div>'
+        :overdue.slice(0,10).map(t=>'<div class="notif-item unread"><div class="notif-dot warn"></div><div><div style="font-size:13px;font-weight:600;">⚠️ '+esc(t.name)+'</div><div style="font-size:11px;color:var(--text-muted);">เกินกำหนด: '+t.due_date+'</div></div></div>').join('');
+    }
+  }catch(e){console.warn('checkNotifications:',e.message);}
+}
+
+function toggleNotifPanel(){
+  const panel=document.getElementById('notif-panel');
+  if(!panel)return;
+  const show=panel.style.display==='none'||panel.style.display==='';
+  panel.style.display=show?'block':'none';
+  if(show)checkNotifications();
+}
+
+function markAllRead(){
+  const badge=document.getElementById('notif-badge');
+  if(badge){badge.textContent='0';badge.style.display='none';}
+  document.querySelectorAll('#notif-list .notif-item.unread').forEach(el=>el.classList.remove('unread'));
+}
+
+// ══════════════════════════════════════════════
+//  TEAM
+// ══════════════════════════════════════════════
+let _teamsList=[],_memsList=[];
+
+async function loadTeam(){
+  const cont=document.getElementById('team-cont');
+  if(!cont)return;
+  cont.innerHTML='<div class="loading">⏳ กำลังโหลด...</div>';
+  try{
+    const r1=await sb.from('teams').select('*').order('name');
+    const r2=await sb.from('team_members').select('*').order('name');
+    _teamsList=r1.data||[];_memsList=r2.data||[];
+  }catch(e){_teamsList=[];_memsList=[];}
+  if(!_memsList.length){
+    cont.innerHTML='<div class="empty">ยังไม่มีสมาชิก — กด "+ เพิ่มสมาชิก" เพื่อเริ่ม</div>';
+    return;
+  }
+  const teamMap={};_teamsList.forEach(t=>teamMap[t.id]=t);
+  const grouped={};
+  _memsList.forEach(m=>{
+    const k=m.team_id||'__none__';
+    if(!grouped[k])grouped[k]={team:teamMap[k]||{id:null,name:'ไม่ระบุทีม',color:'#94a3b8'},members:[]};
+    grouped[k].members.push(m);
+  });
+  let html='';
+  Object.values(grouped).forEach(function(g){
+    const team=g.team;const members=g.members;
+    html+='<div class="card" style="margin-bottom:16px;">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">';
+    html+='<div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">';
+    html+='<span style="width:12px;height:12px;border-radius:50%;background:'+(team.color||'#6366f1')+';display:inline-block;"></span>'+esc(team.name)+'</div>';
+    if(team.id)html+='<button class="btn btn-ghost btn-sm" onclick="openTeamModal(''+team.id+'')">✏️</button>';
+    html+='</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:16px;">';
+    members.forEach(function(m){
+      const init=(m.name||'?').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+      const col=AV_COLORS[(m.name||'').charCodeAt(0)%AV_COLORS.length];
+      html+='<div class="card" style="padding:14px;display:flex;align-items:center;gap:12px;">';
+      html+='<div style="width:40px;height:40px;border-radius:50%;background:'+col+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;">'+init+'</div>';
+      html+='<div style="flex:1;min-width:0;"><div style="font-weight:600;">'+esc(m.name)+'</div>';
+      html+='<div style="font-size:12px;color:var(--text-muted);">'+esc(m.role_title||'สมาชิก')+'</div>';
+      html+='<span style="font-size:11px;color:var(--primary);">'+(m.member_type==='leader'?'👑 Leader':'👤 Member')+'</span></div>';
+      html+='<div style="display:flex;gap:4px;">';
+      html+='<button class="btn btn-ghost btn-sm" onclick="openMemModal(''+m.id+'')" title="แก้ไข">✏️</button>';
+      html+='<button class="btn btn-ghost btn-sm" onclick="delMember(''+m.id+'')" style="color:var(--danger);" title="ลบ">🗑️</button>';
+      html+='</div></div>';
+    });
+    html+='</div></div>';
+  });
+  cont.innerHTML=html;
+}
+
+async function openMemModal(id){
+  try{
+    const r=await sb.from('teams').select('id,name');
+    const sel=document.getElementById('mm-team');
+    if(sel){
+      let opts='<option value="">— ไม่ระบุทีม —</option>';
+      (r.data||[]).forEach(t=>{opts+='<option value="'+t.id+'">'+esc(t.name)+'</option>';});
+      sel.innerHTML=opts;
+    }
+  }catch(e){}
+  document.getElementById('e-mem-id').value='';
+  document.getElementById('mm-name').value='';
+  document.getElementById('mm-role').value='';
+  const typeEl=document.getElementById('mm-type');if(typeEl)typeEl.value='member';
+  document.getElementById('m-mem-title').textContent='เพิ่มสมาชิก';
+  if(id){
+    try{
+      const r2=await sb.from('team_members').select('*').eq('id',id).single();
+      const m=r2.data;
+      if(m){
+        document.getElementById('e-mem-id').value=m.id;
+        document.getElementById('mm-name').value=m.name||'';
+        document.getElementById('mm-role').value=m.role_title||'';
+        const sel=document.getElementById('mm-team');if(sel&&m.team_id)sel.value=m.team_id;
+        if(typeEl)typeEl.value=m.member_type||'member';
+        document.getElementById('m-mem-title').textContent='แก้ไขสมาชิก';
+      }
+    }catch(e){}
+  }
+  openM('m-member');
+}
+
+async function saveMember(){
+  const id=document.getElementById('e-mem-id').value;
+  const name=document.getElementById('mm-name').value.trim();
+  if(!name)return alert('กรุณากรอกชื่อสมาชิก');
+  const teamIdVal=document.getElementById('mm-team')?.value;
+  const data={
+    name:name,
+    role_title:document.getElementById('mm-role').value.trim(),
+    team_id:teamIdVal||null,
+    member_type:document.getElementById('mm-type')?.value||'member'
+  };
+  try{
+    if(id){await sb.from('team_members').update(data).eq('id',id);await logActivity('team','แก้ไขสมาชิก: '+name);}
+    else{data.created_by=currentUser&&currentUser.id;const r=await sb.from('team_members').insert(data);if(!r.error)await logActivity('team','เพิ่มสมาชิก: '+name);}
+    closeM('m-member');loadTeam();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function delMember(id){
+  if(!confirm('ลบสมาชิกนี้?'))return;
+  try{
+    await sb.from('team_members').delete().eq('id',id);
+    await logActivity('team','ลบสมาชิก');
+    loadTeam();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function openTeamModal(id){
+  document.getElementById('e-team-id').value=id||'';
+  document.getElementById('tm-name').value='';
+  document.getElementById('tm-color').value='#6366f1';
+  document.getElementById('m-team-title').textContent=id?'แก้ไขทีม':'สร้างทีมใหม่';
+  if(id){
+    try{
+      const r=await sb.from('teams').select('*').eq('id',id).single();
+      const t=r.data;
+      if(t){document.getElementById('tm-name').value=t.name||'';document.getElementById('tm-color').value=t.color||'#6366f1';}
+    }catch(e){}
+  }
+  openM('m-team');
+}
+
+async function saveTeam(){
+  const id=document.getElementById('e-team-id').value;
+  const name=document.getElementById('tm-name').value.trim();
+  const color=document.getElementById('tm-color').value||'#6366f1';
+  if(!name)return alert('กรุณากรอกชื่อทีม');
+  try{
+    if(id){await sb.from('teams').update({name:name,color:color}).eq('id',id);}
+    else{await sb.from('teams').insert({name:name,color:color,created_by:currentUser&&currentUser.id});}
+    closeM('m-team');loadTeam();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ══════════════════════════════════════════════
+//  PRODUCTION STAGE BOARD
+// ══════════════════════════════════════════════
+let _prodData={tasks:[],projs:[],mems:[]};
+const PROD_STAGES=[
+  {key:'todo',label:'📋 To Do',color:'#94a3b8'},
+  {key:'inprogress',label:'⚡ In Progress',color:'#6366f1'},
+  {key:'review',label:'🔍 Review',color:'#f59e0b'},
+  {key:'done',label:'✅ Done',color:'#22c55e'},
+];
+
+async function loadProduction(){
+  const board=document.getElementById('prod-board');
+  const kpi=document.getElementById('prod-kpi-bar');
+  if(!board)return;
+  board.innerHTML='<div style="color:var(--text-muted);padding:24px;text-align:center;">⏳ กำลังโหลด...</div>';
+  try{
+    const projFilter=document.getElementById('prod-proj-filter')?.value||'';
+    const rp=await sb.from('projects').select('id,name,customer,status').order('name');
+    const rt=await sb.from('tasks').select('*').order('due_date',{nullsFirst:false});
+    const rm=await sb.from('team_members').select('id,name').order('name');
+    const projs=rp.data||[];const tasks=rt.data||[];const mems=rm.data||[];
+    _prodData={tasks:tasks,projs:projs,mems:mems};
+    const pSel=document.getElementById('prod-proj-filter');
+    if(pSel){const c=pSel.value;let o='<option value="">— ทุก Project —</option>';projs.forEach(p=>{o+='<option value="'+p.id+'"'+(c==p.id?' selected':'')+'>'+esc(p.name)+'</option>';});pSel.innerHTML=o;}
+    const sSel=document.getElementById('prod-staff-filter');
+    if(sSel){const c=sSel.value;let o='<option value="">👤 ทุก Staff</option>';mems.forEach(m=>{o+='<option value="'+m.id+'"'+(c==m.id?' selected':'')+'>'+esc(m.name)+'</option>';});sSel.innerHTML=o;}
+    const cSel=document.getElementById('prod-customer-filter');
+    if(cSel){const custs=[...new Set(projs.map(p=>p.customer).filter(Boolean))].sort();const c=cSel.value;let o='<option value="">🏭 ทุก Customer</option>';custs.forEach(x=>{o+='<option value="'+esc(x)+'"'+(c===x?' selected':'')+'>'+esc(x)+'</option>';});cSel.innerHTML=o;}
+    if(kpi){
+      const today=new Date();today.setHours(0,0,0,0);
+      const done=tasks.filter(t=>t.status==='done').length;
+      const inprog=tasks.filter(t=>t.status==='inprogress').length;
+      const overdue=tasks.filter(t=>t.due_date&&new Date(t.due_date)<today&&t.status!=='done').length;
+      const kpiData=[{icon:'📋',val:tasks.length,label:'Total',color:'#6366f1'},{icon:'⚡',val:inprog,label:'In Progress',color:'#f59e0b'},{icon:'✅',val:done,label:'Done',color:'#22c55e'},{icon:'⚠️',val:overdue,label:'Overdue',color:'#ef4444'}];
+      kpi.innerHTML=kpiData.map(k=>'<div class="prod-kpi-card"><div class="prod-kpi-icon" style="background:'+k.color+'22;">'+k.icon+'</div><div><div class="prod-kpi-val" style="color:'+k.color+'">'+k.val+'</div><div class="prod-kpi-label">'+k.label+'</div></div></div>').join('');
+    }
+    _renderProdBoard(tasks,projs,mems,projFilter);
+  }catch(e){board.innerHTML='<div class="empty">เกิดข้อผิดพลาด: '+esc(e.message)+'</div>';}
+}
+
+function _renderProdBoard(tasks,projs,mems,projFilter){
+  const board=document.getElementById('prod-board');if(!board)return;
+  const search=(document.getElementById('prod-search')?.value||'').toLowerCase();
+  const staffFilter=document.getElementById('prod-staff-filter')?.value||'';
+  const custFilter=document.getElementById('prod-customer-filter')?.value||'';
+  const projMap={};projs.forEach(p=>{projMap[p.id]=p;});
+  const memMap={};mems.forEach(m=>{memMap[m.id]=m;});
+  let filtered=tasks;
+  if(projFilter)filtered=filtered.filter(t=>String(t.project_id)===String(projFilter));
+  if(staffFilter)filtered=filtered.filter(t=>String(t.assignee_id)===String(staffFilter));
+  if(custFilter)filtered=filtered.filter(t=>(projMap[t.project_id]||{}).customer===custFilter);
+  if(search)filtered=filtered.filter(t=>(t.name||'').toLowerCase().includes(search)||((projMap[t.project_id]||{}).name||'').toLowerCase().includes(search));
+  const today=new Date();today.setHours(0,0,0,0);
+  let html='<div class="prod-board">';
+  PROD_STAGES.forEach(function(stage){
+    const st=filtered.filter(t=>(t.status||'todo')===stage.key);
+    const icon=stage.label.split(' ')[0];
+    const stageName=stage.label.split(' ').slice(1).join(' ');
+    html+='<div class="prod-col">';
+    html+='<div class="prod-col-head"><div class="prod-col-head-top"><div class="prod-col-head-label">';
+    html+='<span class="prod-col-head-icon">'+icon+'</span><span class="prod-col-head-name">'+stageName+'</span></div>';
+    html+='<span style="background:'+stage.color+'22;color:'+stage.color+';border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">'+st.length+'</span></div>';
+    html+='<div class="prod-col-head-bar" style="background:'+stage.color+'"></div></div>';
+    html+='<div class="prod-col-body">';
+    if(st.length===0){
+      html+='<div class="prod-card-empty">ไม่มีงาน</div>';
+    }else{
+      st.forEach(function(t){
+        const proj=projMap[t.project_id];const mem=memMap[t.assignee_id];
+        const isLate=t.due_date&&new Date(t.due_date)<today&&t.status!=='done';
+        const prioColor=t.priority==='high'?'#ef4444':t.priority==='medium'?'#f59e0b':'#94a3b8';
+        const init=mem?(mem.name||'?').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2):'?';
+        const memCol=mem?AV_COLORS[(mem.name||'').charCodeAt(0)%AV_COLORS.length]:'#94a3b8';
+        html+='<div class="prod-card">';
+        html+='<div class="prod-card-priority-bar" style="background:'+prioColor+'"></div>';
+        if(isLate)html+='<div class="prod-card-stuck">🚨 เกินกำหนด</div>';
+        html+='<div class="prod-card-body">';
+        html+='<div class="prod-card-title">'+esc(t.name)+'</div>';
+        if(proj)html+='<div class="prod-card-proj">📁 '+esc(proj.name)+'</div>';
+        html+='<div class="prod-card-footer">';
+        html+='<div class="prod-card-assign">';
+        if(mem)html+='<div class="prod-card-assign-av" style="background:'+memCol+'">'+init+'</div>'+esc(mem.name);
+        html+='</div>';
+        if(t.due_date)html+='<span class="prod-card-days" style="'+(isLate?'background:#fee2e2;color:#dc2626':'background:#f0fdf4;color:#16a34a')+'">'+(isLate?'⚠️ ':'📅 ')+t.due_date+'</span>';
+        html+='</div></div></div>';
+      });
+    }
+    html+='</div></div>';
+  });
+  html+='</div>';
+  board.innerHTML=html;
+}
+
+function filterProduction(){
+  const d=_prodData;
+  const projFilter=document.getElementById('prod-proj-filter')?.value||'';
+  _renderProdBoard(d.tasks,d.projs,d.mems,projFilter);
+}
+
+function clearProdFilters(){
+  ['prod-search','prod-proj-filter','prod-staff-filter','prod-customer-filter'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
+  loadProduction();
+}
+
+// ══════════════════════════════════════════════
+//  PROJECT GROUPS
+// ══════════════════════════════════════════════
+async function openGroupModal(id){
+  document.getElementById('grp-edit-id').value=id||'';
+  document.getElementById('grp-name').value='';
+  document.getElementById('grp-color').value='#6366f1';
+  document.getElementById('m-group-title').textContent=id?'แก้ไขกลุ่มงาน':'➕ สร้างกลุ่มงาน';
+  if(id){
+    const g=(pgData||[]).find(function(x){return String(x.id)===String(id);});
+    if(g){document.getElementById('grp-name').value=g.name||'';document.getElementById('grp-color').value=g.color||'#6366f1';}
+  }
+  openM('m-group');
+}
+
+async function saveGroup(){
+  const id=document.getElementById('grp-edit-id').value;
+  const name=document.getElementById('grp-name').value.trim();
+  const color=document.getElementById('grp-color').value||'#6366f1';
+  if(!name)return alert('กรุณากรอกชื่อกลุ่มงาน');
+  try{
+    if(id){await sb.from('project_groups').update({name:name,color:color}).eq('id',id);}
+    else{await sb.from('project_groups').insert({name:name,color:color,created_by:currentUser&&currentUser.id});}
+    closeM('m-group');loadProjects();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function delGroup(id){
+  if(!confirm('ลบกลุ่มงานนี้?'))return;
+  try{
+    await sb.from('projects').update({group_id:null}).eq('group_id',id);
+    await sb.from('project_groups').delete().eq('id',id);
+    loadProjects();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ══════════════════════════════════════════════
+//  STUB FUNCTIONS (prevent ReferenceError)
+// ══════════════════════════════════════════════
+function addTaskComment(){alert('ฟีเจอร์นี้กำลังพัฒนา');}
+function saveSubtask(){alert('ฟีเจอร์นี้กำลังพัฒนา');}
+function switchTaskTab(tab){
+  document.querySelectorAll('[data-tab]').forEach(function(el){el.classList.toggle('active',el.dataset.tab===tab);});
+  document.querySelectorAll('[data-pane]').forEach(function(el){el.style.display=el.dataset.pane===tab?'block':'none';});
+}
+function toggleTaskExpand(id){const el=document.getElementById('task-expand-'+id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+function uploadTaskFiles(){alert('ฟีเจอร์นี้กำลังพัฒนา');}
+
 // auto-load hooks are handled directly in nav onclick
 
 </script>
@@ -4419,74 +4177,6 @@ async function createProjectFromTemplate(){
     <div class="form-actions"><button class="btn btn-ghost btn-sm" onclick="closeM('m-reassign')">ยกเลิก</button><button class="btn btn-primary btn-sm" onclick="confirmReassign()">ยืนยัน</button></div>
   </div>
 </div>
-
-
-<!-- Modal: Review Board Analysis -->
-<div class="modal-overlay" id="m-rb" onclick="if(event.target===this)closeM('m-rb')">
-  <div class="modal" style="width:560px;max-width:95vw;">
-    <div class="modal-title" id="m-rb-title">➕ เพิ่ม Analysis</div>
-    <input type="hidden" id="rb-edit-id">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <div class="form-group" style="grid-column:1/-1;">
-        <label class="form-label">ชื่อ Analysis *</label>
-        <input class="form-input" id="rb-name" placeholder="ชื่อการวิเคราะห์...">
-      </div>
-      <div class="form-group">
-        <label class="form-label">📁 Project</label>
-        <select class="form-input" id="rb-proj"></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">📋 Stage</label>
-        <select class="form-input" id="rb-stage">
-          <option value="ideation">Ideation</option>
-          <option value="planning">Planning</option>
-          <option value="review">Review & Recommendation</option>
-          <option value="decision">Decision Made</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">✅ Go / No-Go</label>
-        <select class="form-input" id="rb-go">
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="hold">On Hold</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">⚠️ Risk Level</label>
-        <select class="form-input" id="rb-risk">
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="critical">Critical</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">⏱️ Horizon (ปี)</label>
-        <input type="number" class="form-input" id="rb-horizon" placeholder="เช่น 3" min="0">
-      </div>
-      <div class="form-group">
-        <label class="form-label">💰 Discount Rate (%)</label>
-        <input type="number" class="form-input" id="rb-discount" placeholder="เช่น 8" min="0">
-      </div>
-      <div class="form-group" style="grid-column:1/-1;">
-        <label class="form-label">🏷️ Type (เลือกได้หลายอย่าง)</label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" id="rb-type-simple" value="Simple"> Simple</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" id="rb-type-tech" value="Technical"> Technical</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" id="rb-type-complex" value="Complex"> Complex</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" id="rb-type-comp" value="Compliance"> Compliance</label>
-        </div>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost" onclick="closeM('m-rb')">ยกเลิก</button>
-      <button class="btn btn-primary" onclick="saveRb()">บันทึก</button>
-    </div>
-  </div>
-</div>
-
 
 <!-- Modal: Project Group -->
 <div class="modal-overlay" id="m-group" onclick="if(event.target===this)closeM('m-group')">
