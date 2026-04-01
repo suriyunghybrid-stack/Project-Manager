@@ -59,7 +59,7 @@ function _rtRefreshCurrent(){
   const active=document.querySelector('.page.active');
   if(!active)return;
   const name=active.id.replace('page-','');
-  const map={dashboard:loadDashboard,jobboard:loadJobBoard,projects:loadProjects,tasks:loadTasks,gantt:loadGantt,workload:loadWorkload,auditlog:loadAuditLog};
+  const map={dashboard:loadDashboard,jobboard:loadJobBoard,projects:loadProjects,tasks:loadTasks,gantt:loadGantt,workload:loadWorkload,auditlog:loadAuditLog,machinegantt:loadMachineGantt};
   if(map[name])map[name]();
   checkNotifications();
 }
@@ -756,6 +756,42 @@ select.form-input option{background:#fff;}
 .toggle-switch input:checked+.toggle-slider{background:var(--primary);}
 .toggle-switch input:checked+.toggle-slider:before{transform:translateX(18px);}
 
+/* ── Machine Load Gantt ───────────────────────────────────────── */
+.mg-outer{overflow:auto;border-radius:var(--radius);}
+.mg-grid{min-width:max-content;position:relative;font-size:13px;}
+.mg-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.mg-header-row{display:flex;position:sticky;top:0;z-index:10;background:var(--surface2);border-bottom:2px solid var(--border);}
+.mg-label-col{width:220px;min-width:220px;padding:8px 12px;font-weight:600;font-size:12px;color:var(--text-muted);border-right:1px solid var(--border);}
+.mg-day-cell{width:32px;min-width:32px;text-align:center;padding:6px 0;font-size:11px;color:var(--text-muted);border-left:1px solid var(--border);line-height:1.3;}
+.mg-day-cell.weekend{background:rgba(100,116,139,.07);}
+.mg-day-cell.today-col{background:rgba(99,102,241,.1);color:var(--primary);font-weight:700;}
+.mg-row{display:flex;border-bottom:1px solid var(--border);min-height:56px;position:relative;}
+.mg-row:hover{background:rgba(99,102,241,.025);}
+.mg-row-label{width:220px;min-width:220px;padding:10px 12px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;border-right:1px solid var(--border);background:var(--surface);position:sticky;left:0;z-index:5;}
+.mg-row-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;}
+.mg-timeline{position:relative;display:flex;flex-shrink:0;}
+.mg-cell{width:32px;min-width:32px;height:56px;border-left:1px solid rgba(226,232,240,.6);flex-shrink:0;box-sizing:border-box;}
+.mg-cell.weekend{background:rgba(100,116,139,.045);}
+.mg-cell.today-col{background:rgba(99,102,241,.04);}
+.mg-bar{position:absolute;height:32px;top:12px;border-radius:6px;cursor:grab;display:flex;align-items:center;padding:0 24px 0 8px;font-size:11px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;user-select:none;box-shadow:var(--shadow);transition:opacity .1s,filter .1s;}
+.mg-bar:hover{opacity:.88;filter:brightness(1.06);}
+.mg-bar:active{cursor:grabbing;}
+.mg-bar-resize{position:absolute;right:0;top:0;width:10px;height:100%;cursor:ew-resize;background:rgba(255,255,255,.18);border-radius:0 6px 6px 0;opacity:0;transition:opacity .15s;}
+.mg-bar:hover .mg-bar-resize{opacity:1;}
+.mg-ghost{position:absolute;height:32px;top:12px;border-radius:6px;pointer-events:none;z-index:20;opacity:.45;border:2px dashed rgba(255,255,255,.9);}
+.mg-load-row{height:6px;position:relative;background:var(--surface2);border-top:1px solid var(--border);}
+.mg-load-fill{height:100%;border-radius:0 3px 3px 0;transition:width .3s;}
+.mg-today-line{position:absolute;top:0;bottom:0;width:2px;background:var(--primary);opacity:.55;z-index:8;pointer-events:none;}
+.mg-tooltip{position:fixed;background:#1e293b;color:#f8fafc;padding:10px 14px;border-radius:8px;font-size:12px;pointer-events:none;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.28);min-width:180px;line-height:1.8;display:none;}
+.mg-empty{padding:60px 20px;text-align:center;color:var(--text-muted);font-size:14px;line-height:2;}
+.mg-chip{padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;cursor:pointer;color:var(--text-muted);transition:all .15s;}
+.mg-chip:hover{border-color:var(--primary);color:var(--primary);}
+.mg-chip.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+.mg-toggle-btn{padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;cursor:pointer;color:var(--text);transition:all .15s;}
+.mg-toggle-btn:hover{border-color:var(--primary);color:var(--primary);}
+.mg-toggle-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+/* ── End Machine Load Gantt ───────────────────────────────────── */
+
 </style>
 </head>
 <body>
@@ -809,6 +845,7 @@ select.form-input option{background:#fff;}
       <div class="nav-item" onclick="showPage('auditlog',this)"><span class="nav-icon">📋</span><span>Audit Log</span></div>
       <div class="nav-item" onclick="showPage('production',this);setTimeout(loadProduction,100);"><span class="nav-icon">🏭</span><span>Production</span></div>
       <div class="nav-item" onclick="showPage('qc',this);setTimeout(loadQCRecords,100);"><span class="nav-icon">🔬</span><span>QC Records</span></div>
+      <div class="nav-item" onclick="showPage('machinegantt',this);setTimeout(loadMachineGantt,100);"><span class="nav-icon">⚙️</span><span>Machine Load</span></div>
             <div class="notif-wrap">
         <button class="notif-bell" onclick="toggleNotifPanel()" title="แจ้งเตือน">
           🔔<span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:50%;font-size:10px;font-weight:700;min-width:18px;height:18px;display:none;align-items:center;justify-content:center;line-height:1;">0</span>
@@ -1215,6 +1252,30 @@ select.form-input option{background:#fff;}
               <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--text-muted);">⏳ กำลังโหลด...</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Machine Load Gantt Page -->
+      <div id="page-machinegantt" class="page">
+        <div class="page-header" style="flex-wrap:wrap;gap:12px;">
+          <div>
+            <div class="page-title">⚙️ Machine Load</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">ภาระงานของแต่ละคน/เครื่อง — ลากเพื่อจัดตาราง</div>
+          </div>
+          <div class="mg-toolbar" id="mg-toolbar">
+            <button class="mg-toggle-btn active" id="mg-btn-owner" onclick="_mgSetView('owner')">👤 Owner</button>
+            <button class="mg-toggle-btn" id="mg-btn-machine" onclick="_mgSetView('machine')">🔧 Machine</button>
+            <div style="width:1px;height:24px;background:var(--border);"></div>
+            <div id="mg-team-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+            <div style="width:1px;height:24px;background:var(--border);"></div>
+            <button class="btn btn-ghost btn-sm" onclick="_mgPrev()">◀</button>
+            <button class="btn btn-ghost btn-sm" onclick="_mgToday()">วันนี้</button>
+            <button class="btn btn-ghost btn-sm" onclick="_mgNext()">▶</button>
+            <span id="mg-date-label" style="font-size:13px;color:var(--text-muted);min-width:160px;"></span>
+          </div>
+        </div>
+        <div class="mg-outer card" id="mg-outer" style="padding:0;overflow:auto;">
+          <div id="mg-grid"><div class="mg-empty">⏳ กำลังโหลด...</div></div>
         </div>
       </div>
 
@@ -1692,6 +1753,7 @@ function showPage(name,el){
   if(name==='team')loadTeam();
   if(name==='workload')loadWorkload();
   if(name==='auditlog')loadAuditLog();
+  if(name==='machinegantt')loadMachineGantt();
 }
 
 // ══════════════════════════════════════════════
@@ -4175,6 +4237,213 @@ function switchTaskTab(tab){
 }
 function toggleTaskExpand(id){const el=document.getElementById('task-expand-'+id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
 function uploadTaskFiles(){alert('ฟีเจอร์นี้กำลังพัฒนา');}
+
+// ─── Machine Load Gantt ────────────────────────────────────────
+const MG_DAY_W=32,MG_ROW_H=56,MG_LABEL_W=220,MG_DAYS=28;
+let _mgView='owner',_mgTeamId=null,_mgStart=null,_mgData={jobs:[],members:[],teams:[],machines:[]},_mgDrag=null,_mgTTEl=null;
+
+async function loadMachineGantt(){
+  if(!_mgStart){const d=new Date();d.setDate(d.getDate()-7);_mgStart=new Date(d.toDateString());}
+  document.getElementById('mg-grid').innerHTML='<div class="mg-empty">⏳ กำลังโหลด...</div>';
+  try{
+    const[jRes,mRes,tRes]=await Promise.all([
+      sb.from('jobs').select('*'),
+      sb.from('team_members').select('*'),
+      sb.from('teams').select('*')
+    ]);
+    let machines=[];
+    try{const mr=await sb.from('machines').select('*');machines=mr.data||[];}catch(e){}
+    _mgData={jobs:jRes.data||[],members:mRes.data||[],teams:tRes.data||[],machines};
+    const chips=document.getElementById('mg-team-chips');
+    if(chips){
+      chips.innerHTML='<button class="mg-chip active" onclick="_mgFilterTeam(null,this)">ทุกทีม</button>'
+        +(_mgData.teams||[]).map(t=>`<button class="mg-chip" onclick="_mgFilterTeam(${t.id},this)">${esc(t.name)}</button>`).join('');
+    }
+    renderMachineGantt();
+  }catch(err){
+    document.getElementById('mg-grid').innerHTML=`<div class="mg-empty">❌ ${esc(err.message)}<br><small>ตรวจสอบว่ามี table <b>jobs</b> ใน Supabase หรือยัง</small></div>`;
+  }
+}
+
+function renderMachineGantt(){
+  const{jobs,members,teams,machines}=_mgData;
+  const start=_mgStart,days=MG_DAYS;
+  const fmt=d=>d.toLocaleDateString('th-TH',{day:'numeric',month:'short'});
+  const endDate=new Date(start);endDate.setDate(endDate.getDate()+days-1);
+  const lbl=document.getElementById('mg-date-label');
+  if(lbl)lbl.textContent=fmt(start)+' – '+fmt(endDate);
+  const btnO=document.getElementById('mg-btn-owner'),btnM=document.getElementById('mg-btn-machine');
+  if(btnO)btnO.classList.toggle('active',_mgView==='owner');
+  if(btnM)btnM.classList.toggle('active',_mgView==='machine');
+
+  let filteredJobs=jobs;
+  if(_mgTeamId!=null){
+    const mids=(members||[]).filter(m=>m.team_id==_mgTeamId).map(m=>m.id);
+    filteredJobs=jobs.filter(j=>mids.includes(j.owner_id));
+  }
+
+  let rows=[];
+  if(_mgView==='owner'){
+    const ownerSet=[...new Set(filteredJobs.map(j=>j.owner_id).filter(Boolean))];
+    rows=ownerSet.map(oid=>{
+      const m=(members||[]).find(x=>x.id==oid)||{id:oid,name:'#'+oid};
+      return{key:oid,label:m.name,color:AV_COLORS[oid%AV_COLORS.length],jobs:filteredJobs.filter(j=>j.owner_id==oid)};
+    });
+    const unassigned=filteredJobs.filter(j=>!j.owner_id);
+    if(unassigned.length)rows.push({key:null,label:'ไม่ระบุ',color:'#94a3b8',jobs:unassigned});
+  }else{
+    const machSet=[...new Set(filteredJobs.map(j=>j.machine_id).filter(Boolean))];
+    rows=machSet.map(mid=>{
+      const mc=(machines||[]).find(x=>x.id==mid)||{id:mid,name:'Machine '+mid};
+      return{key:mid,label:mc.name,color:AV_COLORS[mid%AV_COLORS.length],jobs:filteredJobs.filter(j=>j.machine_id==mid)};
+    });
+  }
+
+  const dates=[];
+  for(let i=0;i<days;i++){const d=new Date(start);d.setDate(d.getDate()+i);dates.push(d);}
+  const today=new Date(new Date().toDateString());
+  const todayIdx=dates.findIndex(d=>d.getTime()===today.getTime());
+  const totalW=days*MG_DAY_W;
+  const dayNames=['อา','จ','อ','พ','พฤ','ศ','ส'];
+
+  let html=`<div class="mg-header-row"><div class="mg-label-col">${_mgView==='owner'?'👤 Owner':'🔧 Machine'}</div>`;
+  dates.forEach((d,i)=>{
+    const isW=d.getDay()===0||d.getDay()===6,isTd=i===todayIdx;
+    html+=`<div class="mg-day-cell${isW?' weekend':''}${isTd?' today-col':''}">${d.getDate()}<br><span style="font-size:9px">${dayNames[d.getDay()]}</span></div>`;
+  });
+  html+=`</div>`;
+
+  rows.forEach(row=>{
+    let occ=0;
+    row.jobs.forEach(j=>{
+      if(!j.start_date)return;
+      const js=new Date(j.start_date),je=new Date(js);je.setDate(je.getDate()+(j.duration||1)-1);
+      dates.forEach(d=>{if(d>=js&&d<=je)occ++;});
+    });
+    const lp=Math.min(100,Math.round(occ/days*100));
+    const lc=lp>=80?'#ef4444':lp>=50?'#f59e0b':'#22c55e';
+    html+=`<div class="mg-row" data-row="${row.key??'null'}">`;
+    html+=`<div class="mg-row-label"><div class="mg-row-avatar" style="background:${row.color}">${esc(row.label.charAt(0))}</div><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(row.label)}</span><span style="margin-left:auto;font-size:11px;color:var(--text-muted);">${lp}%</span></div>`;
+    html+=`<div class="mg-timeline" style="width:${totalW}px;position:relative;">`;
+    dates.forEach((d,i)=>{
+      const isW=d.getDay()===0||d.getDay()===6,isTd=i===todayIdx;
+      html+=`<div class="mg-cell${isW?' weekend':''}${isTd?' today-col':''}"></div>`;
+    });
+    if(todayIdx>=0)html+=`<div class="mg-today-line" style="left:${todayIdx*MG_DAY_W+MG_DAY_W/2}px;"></div>`;
+    row.jobs.forEach(j=>{
+      if(!j.start_date)return;
+      const js=new Date(j.start_date);
+      const off=Math.round((js-start)/86400000);
+      const dur=Math.max(1,j.duration||1);
+      const lx=off*MG_DAY_W,ww=dur*MG_DAY_W-4;
+      if(lx+ww<0||lx>totalW)return;
+      const bc=AV_COLORS[(j.id||0)%AV_COLORS.length];
+      const sd=j.start_date;
+      const jname=esc(j.name||'');
+      const jtype=esc(j.type||'');
+      const jstat=esc(j.status||'');
+      html+=`<div class="mg-bar" style="left:${lx}px;width:${ww}px;background:${bc};" data-id="${j.id}" data-start="${sd}" data-dur="${dur}" data-row="${row.key??'null'}" onmousedown="_mlMouseDown(event,false)" onmouseenter="_mlShowTooltip(event,'${jname}','${jtype}','${jstat}','${sd}',${dur})" onmouseleave="_mlHideTooltip()">${jname}<div class="mg-bar-resize" onmousedown="event.stopPropagation();_mlMouseDown(event,true)"></div></div>`;
+    });
+    html+=`</div></div>`;
+    html+=`<div class="mg-load-row" title="${lp}% load" style="margin-left:${MG_LABEL_W}px;"><div class="mg-load-fill" style="width:${lp}%;background:${lc};"></div></div>`;
+  });
+  if(!rows.length)html+=`<div class="mg-empty">ไม่มีข้อมูล Jobs ในช่วงนี้<br><small style="color:var(--text-muted);">สร้าง table <b>jobs</b> ใน Supabase แล้วเพิ่มข้อมูลเพื่อเริ่มใช้งาน</small></div>`;
+  document.getElementById('mg-grid').innerHTML=html;
+  _mlAttachListeners();
+}
+
+function _mgPrev(){_mgStart=new Date(_mgStart);_mgStart.setDate(_mgStart.getDate()-7);renderMachineGantt();}
+function _mgNext(){_mgStart=new Date(_mgStart);_mgStart.setDate(_mgStart.getDate()+7);renderMachineGantt();}
+function _mgToday(){const d=new Date();d.setDate(d.getDate()-7);_mgStart=new Date(d.toDateString());renderMachineGantt();}
+function _mgSetView(v){_mgView=v;renderMachineGantt();}
+function _mgFilterTeam(id,el){
+  _mgTeamId=id;
+  document.querySelectorAll('#mg-team-chips .mg-chip').forEach(c=>c.classList.remove('active'));
+  if(el)el.classList.add('active');
+  renderMachineGantt();
+}
+
+function _mlAttachListeners(){
+  if(window._mgListenersAttached)return;
+  window._mgListenersAttached=true;
+  document.addEventListener('mousemove',_mlMouseMove);
+  document.addEventListener('mouseup',_mlMouseUp);
+}
+
+function _mlMouseDown(e,isResize){
+  e.preventDefault();e.stopPropagation();
+  const bar=e.currentTarget.classList.contains('mg-bar')?e.currentTarget:e.currentTarget.closest('.mg-bar');
+  if(!bar)return;
+  const ghost=document.createElement('div');
+  ghost.className='mg-ghost';
+  ghost.style.cssText=`left:${bar.offsetLeft}px;width:${bar.offsetWidth}px;background:${bar.style.background};`;
+  bar.parentElement.appendChild(ghost);
+  _mgDrag={bar,ghost,isResize,startX:e.clientX,origLeft:bar.offsetLeft,origWidth:bar.offsetWidth,
+    jobId:+bar.dataset.id,jobStart:bar.dataset.start,jobDur:+bar.dataset.dur,rowKey:bar.dataset.row};
+}
+
+function _mlMouseMove(e){
+  if(!_mgDrag)return;
+  const dx=e.clientX-_mgDrag.startX;
+  if(_mgDrag.isResize){
+    const nw=Math.max(MG_DAY_W,_mgDrag.origWidth+dx);
+    _mgDrag.ghost.style.width=(Math.round(nw/MG_DAY_W)*MG_DAY_W-4)+'px';
+  }else{
+    _mgDrag.ghost.style.left=(Math.round((_mgDrag.origLeft+dx)/MG_DAY_W)*MG_DAY_W)+'px';
+  }
+}
+
+async function _mlMouseUp(e){
+  if(!_mgDrag)return;
+  const{bar,ghost,isResize,origLeft,origWidth,jobId,jobStart,jobDur,rowKey}=_mgDrag;
+  _mgDrag=null;
+  const newLeft=parseInt(ghost.style.left||origLeft);
+  const newWidth=parseInt(ghost.style.width||(origWidth+'px'));
+  ghost.remove();
+  const offsetDays=Math.round(newLeft/MG_DAY_W);
+  const newDur=Math.round((newWidth+4)/MG_DAY_W);
+  const ns=new Date(_mgStart);ns.setDate(ns.getDate()+offsetDays);
+  const finalStart=isResize?jobStart:ns.toISOString().split('T')[0];
+  const finalDur=isResize?newDur:jobDur;
+  const rowJobs=_mgData.jobs.filter(j=>{
+    const k=rowKey==='null'?null:+rowKey;
+    return _mgView==='owner'?(j.owner_id==k):(j.machine_id==k);
+  });
+  const pushed=_mlAutoPush({id:jobId,start_date:finalStart,duration:finalDur},rowJobs);
+  await Promise.all(pushed.map(j=>_mlSaveJob(j.id,j.start_date,j.duration)));
+  pushed.forEach(pj=>{const idx=_mgData.jobs.findIndex(j=>j.id===pj.id);if(idx>=0)Object.assign(_mgData.jobs[idx],pj);});
+  renderMachineGantt();
+}
+
+function _mlAutoPush(moved,all){
+  const work=all.map(j=>j.id===moved.id?{...j,...moved}:{...j});
+  work.sort((a,b)=>new Date(a.start_date)-new Date(b.start_date));
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(let i=1;i<work.length;i++){
+      const pr=work[i-1],cu=work[i];
+      const pe=new Date(pr.start_date);pe.setDate(pe.getDate()+pr.duration);
+      if(new Date(cu.start_date)<pe){cu.start_date=pe.toISOString().split('T')[0];changed=true;}
+    }
+  }
+  return work.filter(w=>{const o=all.find(j=>j.id===w.id);return o&&(o.start_date!==w.start_date||o.duration!==w.duration);});
+}
+
+async function _mlSaveJob(id,startDate,duration){
+  try{await sb.from('jobs').update({start_date:startDate,duration}).eq('id',id);}
+  catch(e){console.warn('MG save error',e);}
+}
+
+function _mlShowTooltip(e,name,type,status,startDate,dur){
+  if(!_mgTTEl){_mgTTEl=document.createElement('div');_mgTTEl.className='mg-tooltip';document.body.appendChild(_mgTTEl);}
+  _mgTTEl.innerHTML=`<b>${name}</b><br>📅 ${startDate} (${dur} วัน)<br>🏷️ ${type||'-'} | ${status||'-'}`;
+  _mgTTEl.style.display='block';
+  _mlPositionTooltip(e);
+}
+function _mlHideTooltip(){if(_mgTTEl)_mgTTEl.style.display='none';}
+function _mlPositionTooltip(e){if(_mgTTEl){_mgTTEl.style.left=(e.clientX+14)+'px';_mgTTEl.style.top=(e.clientY-10)+'px';}}
+// ─── End Machine Load Gantt ────────────────────────────────────
 
 // auto-load hooks are handled directly in nav onclick
 
