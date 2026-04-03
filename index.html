@@ -59,7 +59,7 @@ function _rtRefreshCurrent(){
   const active=document.querySelector('.page.active');
   if(!active)return;
   const name=active.id.replace('page-','');
-  const map={dashboard:loadDashboard,jobboard:loadJobBoard,projects:loadProjects,tasks:loadTasks,gantt:loadGantt,workload:loadWorkload,auditlog:loadAuditLog,machinegantt:loadMachineGantt};
+  const map={dashboard:loadDashboard,jobboard:loadJobBoard,projects:loadProjects,tasks:loadTasks,gantt:loadGantt,workload:loadWorkload,auditlog:loadAuditLog,machinegantt:loadMachineGantt,assembly:loadAssemblyTracker};
   if(map[name])map[name]();
   checkNotifications();
 }
@@ -792,6 +792,36 @@ select.form-input option{background:#fff;}
 .mg-toggle-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
 /* ── End Machine Load Gantt ───────────────────────────────────── */
 
+/* ── Assembly Tracker ─────────────────────────────────────────── */
+#page-assembly{padding:0;}
+.at-header{background:var(--surface);border-bottom:1.5px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.at-job-sel{flex:1;min-width:220px;padding:8px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;}
+.at-job-info{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text-muted);}
+.at-prog-wrap{padding:10px 20px;background:var(--surface);border-bottom:1.5px solid var(--border);}
+.at-prog-bar-bg{height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-top:4px;}
+.at-prog-bar{height:100%;background:linear-gradient(90deg,#3b82f6,#22c55e);border-radius:5px;transition:width .5s;}
+.at-alert{margin:10px 20px;padding:10px 16px;background:#7f1d1d;border:1.5px solid #ef4444;border-radius:8px;color:#fca5a5;font-size:13px;font-weight:600;display:none;align-items:center;gap:8px;}
+.at-toolbar{padding:10px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1.5px solid var(--border);}
+.at-filter-btn{padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;cursor:pointer;color:var(--text);transition:all .15s;white-space:nowrap;}
+.at-filter-btn:hover{border-color:var(--primary);color:var(--primary);}
+.at-filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+.at-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px 20px;overflow-y:auto;max-height:calc(100vh - 230px);}
+@media(max-width:1200px){.at-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:700px){.at-grid{grid-template-columns:1fr;}}
+.at-grid.compact{grid-template-columns:1fr;gap:4px;padding:10px 20px;}
+.at-card{background:var(--surface);border-radius:10px;overflow:hidden;border:1.5px solid var(--border);transition:box-shadow .2s;}
+.at-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.25);}
+.at-card-header{padding:12px;cursor:pointer;user-select:none;}
+.at-steps-row{display:flex;gap:5px;padding:8px 12px;align-items:center;border-top:1px solid var(--border);flex-wrap:wrap;}
+.at-step-pill{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:help;transition:transform .15s;flex-shrink:0;}
+.at-step-pill:hover{transform:scale(1.25);}
+.at-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;white-space:nowrap;}
+.at-seq{font-size:10px;font-weight:700;color:var(--text-muted);background:var(--border);padding:2px 6px;border-radius:4px;}
+.at-pname{font-weight:600;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.at-card.at-compact{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:6px;border-top:none !important;}
+.at-card.at-compact .at-steps-row{border:none;padding:0;flex-wrap:nowrap;}
+/* ── End Assembly Tracker ────────────────────────────────────── */
+
 </style>
 </head>
 <body>
@@ -846,6 +876,7 @@ select.form-input option{background:#fff;}
       <div class="nav-item" onclick="showPage('production',this);setTimeout(loadProduction,100);"><span class="nav-icon">🏭</span><span>Production</span></div>
       <div class="nav-item" onclick="showPage('qc',this);setTimeout(loadQCRecords,100);"><span class="nav-icon">🔬</span><span>QC Records</span></div>
       <div class="nav-item" onclick="showPage('machinegantt',this);setTimeout(loadMachineGantt,100);"><span class="nav-icon">⚙️</span><span>Machine Load</span></div>
+      <div class="nav-item" onclick="showPage('assembly',this);setTimeout(loadAssemblyTracker,100);"><span class="nav-icon">🔩</span><span>Assembly</span></div>
             <div class="notif-wrap">
         <button class="notif-bell" onclick="toggleNotifPanel()" title="แจ้งเตือน">
           🔔<span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:50%;font-size:10px;font-weight:700;min-width:18px;height:18px;display:none;align-items:center;justify-content:center;line-height:1;">0</span>
@@ -1281,6 +1312,48 @@ select.form-input option{background:#fff;}
           <div id="mg-grid"><div class="mg-empty">⏳ กำลังโหลด...</div></div>
         </div>
       </div>
+
+      <!-- ══════════════ ASSEMBLY TRACKER PAGE ══════════════ -->
+      <div id="page-assembly" class="page">
+        <!-- Header: Job Selector -->
+        <div class="at-header">
+          <span style="font-size:20px;flex-shrink:0;">🔩</span>
+          <span style="font-weight:700;font-size:15px;white-space:nowrap;">Assembly Tracker</span>
+          <select id="at-job-sel" class="at-job-sel" onchange="_atLoadParts(this.value)">
+            <option value="">-- เลือก Assembly Job --</option>
+          </select>
+          <div id="at-job-info" class="at-job-info"></div>
+        </div>
+        <!-- Progress Bar -->
+        <div class="at-prog-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Overall Parts Progress</span>
+            <span id="at-prog-pct" style="font-size:13px;font-weight:700;color:#60a5fa;">0%</span>
+          </div>
+          <div class="at-prog-bar-bg">
+            <div class="at-prog-bar" id="at-prog-bar" style="width:0%"></div>
+          </div>
+        </div>
+        <!-- Alert Bar -->
+        <div class="at-alert" id="at-alert">🚨 พบปัญหา</div>
+        <!-- Toolbar -->
+        <div class="at-toolbar">
+          <button class="at-filter-btn active" onclick="_atSetFilter('all',this)">All</button>
+          <button class="at-filter-btn" onclick="_atSetFilter('in_progress',this)">🔵 In Progress</button>
+          <button class="at-filter-btn" onclick="_atSetFilter('problem',this)">🔴 Problem</button>
+          <button class="at-filter-btn" onclick="_atSetFilter('done',this)">✅ Done</button>
+          <button class="at-filter-btn" onclick="_atSetFilter('queue',this)">🟡 Queue</button>
+          <div style="flex:1;"></div>
+          <button class="at-filter-btn" id="at-compact-btn" onclick="_atToggleCompact()">📦 Compact</button>
+          <button class="at-filter-btn" onclick="loadAssemblyTracker()" title="Refresh data">🔄 Refresh</button>
+        </div>
+        <!-- Part Cards Grid -->
+        <div class="at-grid" id="at-body">
+          <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);font-size:14px;">
+            🔩 เลือก Assembly Job เพื่อดูชิ้นส่วนทั้งหมด
+          </div>
+        </div>
+      </div><!-- end page-assembly -->
 
     </main>
   </div>
@@ -1757,6 +1830,7 @@ function showPage(name,el){
   if(name==='workload')loadWorkload();
   if(name==='auditlog')loadAuditLog();
   if(name==='machinegantt')loadMachineGantt();
+  if(name==='assembly')loadAssemblyTracker();
 }
 
 // ══════════════════════════════════════════════
@@ -4487,6 +4561,268 @@ function _mlShowTooltip(e,name,type,status,startDate,dur){
 function _mlHideTooltip(){if(_mgTTEl)_mgTTEl.style.display='none';}
 function _mlPositionTooltip(e){if(_mgTTEl){_mgTTEl.style.left=(e.clientX+14)+'px';_mgTTEl.style.top=(e.clientY-10)+'px';}}
 // ─── End Machine Load Gantt ────────────────────────────────────
+
+// ─── Assembly Tracker ─────────────────────────────────────────
+let _atJobs=[],_atParts=[],_atProgress=[],_atJobId=null,_atFilter='all',_atCompact=false;
+const AT_STEPS=[
+  {key:'saw',  label:'Saw / ตัด',   icon:'🪚'},
+  {key:'lathe',label:'Lathe / กลึง', icon:'⚙️'},
+  {key:'drill',label:'Drill / เจาะ', icon:'🔩'},
+  {key:'ht',   label:'HT / อบชุบ',  icon:'🔥'},
+  {key:'assy', label:'Assembly',     icon:'🔗'},
+  {key:'qc',   label:'QC / CMM',    icon:'🔬'}
+];
+const _atStColor={done:'#22c55e',in_progress:'#3b82f6',problem:'#ef4444',queue:'#374151',na:'#1e293b'};
+const _atStLabel={done:'✅ Done',in_progress:'🔵 In Progress',problem:'🔴 Problem',queue:'🟡 Queue'};
+
+async function loadAssemblyTracker(){
+  const sel=document.getElementById('at-job-sel');
+  if(!sel)return;
+  try{
+    const{data,error}=await sb.from('assembly_jobs').select('*').order('created_at',{ascending:false});
+    if(error)throw error;
+    _atJobs=data||[];
+  }catch(e){
+    _atJobs=[{id:'demo-712545',job_no:'SO25-0678',part_no:'712545-X7A09',
+      part_name:'FRAME, RR SEAT BACK SIDE, RH',customer:'TOYOTA BOSHOKU',
+      pdc_no:'25-0815',status:'in_progress'}];
+  }
+  sel.innerHTML='<option value="">-- เลือก Assembly Job --</option>'+
+    _atJobs.map(j=>`<option value="${esc(j.id)}">[${esc(j.job_no)}] ${esc(j.part_no)} — ${esc(j.part_name)}</option>`).join('');
+  const keepId=_atJobId&&_atJobs.find(j=>j.id===_atJobId)?_atJobId:(_atJobs[0]?.id||null);
+  if(keepId){sel.value=keepId;await _atLoadParts(keepId);}
+}
+
+async function _atLoadParts(jobId){
+  _atJobId=jobId||null;
+  const body=document.getElementById('at-body');
+  if(!jobId){
+    if(body)body.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);font-size:14px;">🔩 เลือก Assembly Job เพื่อดูชิ้นส่วน</div>';
+    _atClearHeader();return;
+  }
+  if(body)body.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);">⏳ กำลังโหลด...</div>';
+  try{
+    const pRes=await sb.from('assembly_parts').select('*').eq('job_id',jobId).order('seq_no');
+    _atParts=pRes.data||[];
+    if(_atParts.length>0){
+      const ids=_atParts.map(p=>p.id);
+      const rRes=await sb.from('part_progress').select('*').in('part_id',ids);
+      _atProgress=rRes.data||[];
+    }else{_atProgress=[];}
+  }catch(e){console.warn('AT load error',e);_atParts=[];_atProgress=[];}
+  _atRender();
+}
+
+function _atClearHeader(){
+  const pctEl=document.getElementById('at-prog-pct'),bar=document.getElementById('at-prog-bar');
+  const info=document.getElementById('at-job-info'),alert=document.getElementById('at-alert');
+  if(pctEl)pctEl.textContent='0%';if(bar)bar.style.width='0%';
+  if(info)info.innerHTML='';if(alert)alert.style.display='none';
+}
+
+function _atGetPartStatus(partId){
+  const steps=_atProgress.filter(p=>p.part_id===partId);
+  if(!steps.length)return'queue';
+  if(steps.some(s=>s.status==='problem'))return'problem';
+  const active=steps.filter(s=>s.status!=='na');
+  if(active.length&&active.every(s=>s.status==='done'))return'done';
+  if(steps.some(s=>s.status==='in_progress'))return'in_progress';
+  return'queue';
+}
+
+function _atRender(){
+  const job=_atJobs.find(j=>j.id===_atJobId);
+  const total=_atParts.length;
+  const done=_atParts.filter(p=>_atGetPartStatus(p.id)==='done').length;
+  const pct=total>0?Math.round(done/total*100):0;
+  const bar=document.getElementById('at-prog-bar'),pctEl=document.getElementById('at-prog-pct');
+  if(bar)bar.style.width=pct+'%';if(pctEl)pctEl.textContent=pct+'%';
+  if(job){
+    const el=document.getElementById('at-job-info');
+    if(el)el.innerHTML=
+      `<span>👥 ${esc(job.customer||'')}</span>`+
+      `<span>📋 PDC: ${esc(job.pdc_no||'')}</span>`+
+      `<span>🔩 ${total} parts</span>`+
+      `<span style="color:${pct===100?'#22c55e':'#60a5fa'};font-weight:700;">${pct}% Complete</span>`+
+      `<span>${done}/${total} Done</span>`;
+  }
+  const prob=_atParts.filter(p=>_atGetPartStatus(p.id)==='problem');
+  const al=document.getElementById('at-alert');
+  if(al){
+    if(prob.length){al.style.display='flex';al.innerHTML='🚨 พบปัญหา '+prob.length+' ชิ้น: '+prob.map(p=>esc(p.part_name)).slice(0,5).join(', ')+(prob.length>5?'…':'');}
+    else{al.style.display='none';}
+  }
+  let vis=[..._atParts];
+  if(_atFilter!=='all')vis=vis.filter(p=>_atGetPartStatus(p.id)===_atFilter);
+  const body=document.getElementById('at-body');if(!body)return;
+  body.className='at-grid'+(_atCompact?' compact':'');
+  if(!vis.length){body.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);">ไม่มีชิ้นส่วนในกลุ่มนี้</div>';return;}
+  body.innerHTML=vis.map(p=>_atCardHtml(p)).join('');
+}
+
+function _atCardHtml(part){
+  const st=_atGetPartStatus(part.id);
+  const sc=_atStColor[st]||'#6b7280',sl=_atStLabel[st]||st;
+  const steps=_atProgress.filter(p=>p.part_id===part.id);
+  const pills=AT_STEPS.map(step=>{
+    const prog=steps.find(s=>s.step===step.key);
+    const ss=prog?.status||'queue';
+    return`<span class="at-step-pill" style="background:${_atStColor[ss]||'#374151'}" title="${step.label}: ${ss}">${step.icon}</span>`;
+  }).join('');
+  if(_atCompact){
+    return`<div class="at-card at-compact" data-part-id="${part.id}" style="border-left:4px solid ${sc};">
+      <span class="at-seq">#${part.seq_no}</span>
+      <span class="at-pname" title="${esc(part.part_name)}">${esc(part.part_name)}</span>
+      <span style="color:#94a3b8;font-size:11px;white-space:nowrap;flex-shrink:0;">${esc(part.material||'')} ${esc(part.mat_size||'')}</span>
+      <div class="at-steps-row" style="border:none;padding:0;flex-shrink:0;">${pills}</div>
+      <span class="at-badge" style="background:${sc}20;color:${sc};border:1px solid ${sc}40;flex-shrink:0;">${sl}</span>
+    </div>`;}
+  const img=part.image_url
+    ?`<img src="${esc(part.image_url)}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:8px;" onerror="this.style.display='none'">`
+    :`<div style="display:flex;align-items:center;justify-content:center;height:52px;font-size:34px;opacity:.3;margin-bottom:8px;">⚙️</div>`;
+  return`<div class="at-card" style="border-top:3px solid ${sc};" data-part-id="${part.id}">
+    <div class="at-card-header" onclick="_atToggleCard('${part.id}')">
+      ${img}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div>
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;">#${part.seq_no}${part.part_no?' | '+esc(part.part_no):''}</div>
+          <div style="font-weight:700;font-size:13px;line-height:1.4;margin:3px 0;">${esc(part.part_name)}</div>
+          <div style="font-size:11px;color:#94a3b8;">${esc(part.material||'')}${part.mat_size?' | '+esc(part.mat_size):''}${part.qty_required?' | ×'+part.qty_required:''}</div>
+        </div>
+        <span class="at-badge" style="background:${sc}20;color:${sc};border:1px solid ${sc}40;flex-shrink:0;">${sl}</span>
+      </div>
+    </div>
+    <div class="at-steps-row">
+      ${pills}
+      <span style="font-size:10px;color:#475569;margin-left:auto;cursor:pointer;" onclick="_atToggleCard('${part.id}')">▼ detail</span>
+    </div>
+    <div id="at-detail-${part.id}" style="display:none;">
+      ${_atDetailHtml(part,steps)}
+    </div>
+  </div>`;}
+
+function _atDetailHtml(part,steps){
+  const rows=AT_STEPS.map(step=>{
+    const prog=steps.find(s=>s.step===step.key)||{step:step.key,status:'queue',qty_passed:0,qty_rejected:0,notes:''};
+    const ss=prog.status||'queue';
+    const sc=_atStColor[ss]||'#6b7280';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #0f2337;">
+      <div style="width:26px;height:26px;border-radius:50%;background:${sc};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;">${step.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:12px;">${step.label}</div>
+        <div style="font-size:10px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(prog.notes||'—')}</div>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;text-align:right;white-space:nowrap;flex-shrink:0;">
+        ✅${prog.qty_passed||0} ❌${prog.qty_rejected||0}
+      </div>
+      <select onchange="_atUpdateStep('${part.id}','${step.key}',this.value)"
+        style="font-size:11px;padding:3px 6px;border-radius:5px;background:#0f172a;border:1px solid #1e3a5f;color:#e2e8f0;cursor:pointer;flex-shrink:0;">
+        ${['queue','in_progress','done','problem','na'].map(s=>`<option value="${s}"${ss===s?' selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+  return`<div style="border-top:1px solid var(--border);">
+    ${rows}
+    <div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;background:#080f1a;border-top:1px solid #0f2337;">
+      <input type="number" min="0" placeholder="Qty Passed" id="at-qp-${part.id}"
+        style="width:110px;padding:5px 8px;background:#0f172a;border:1px solid #1e3a5f;border-radius:5px;color:#e2e8f0;font-size:12px;">
+      <input type="number" min="0" placeholder="Qty Rejected" id="at-qr-${part.id}"
+        style="width:120px;padding:5px 8px;background:#0f172a;border:1px solid #1e3a5f;border-radius:5px;color:#e2e8f0;font-size:12px;">
+      <textarea placeholder="Notes / observations..." id="at-note-${part.id}" rows="2"
+        style="flex:1;min-width:150px;padding:5px 8px;background:#0f172a;border:1px solid #1e3a5f;border-radius:5px;color:#e2e8f0;font-size:12px;resize:vertical;"></textarea>
+      <button onclick="_atSaveNotes('${part.id}')"
+        style="padding:5px 14px;background:#1e3a5f;border:1px solid #3b82f6;border-radius:5px;color:#60a5fa;font-size:12px;cursor:pointer;white-space:nowrap;">💾 Save</button>
+    </div>
+  </div>`;}
+
+function _atToggleCard(partId){
+  const el=document.getElementById('at-detail-'+partId);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+
+async function _atUpdateStep(partId,stepKey,status){
+  try{
+    const existing=_atProgress.find(p=>p.part_id===partId&&p.step===stepKey);
+    if(existing){
+      await sb.from('part_progress').update({status,updated_at:new Date().toISOString()}).eq('id',existing.id);
+      existing.status=status;
+    }else{
+      const{data}=await sb.from('part_progress').insert({part_id:partId,step:stepKey,status}).select().single();
+      if(data)_atProgress.push(data);
+    }
+    _atPatchCard(partId);
+  }catch(e){console.warn('AT step update error',e);}
+}
+
+async function _atSaveNotes(partId){
+  const qp=parseInt(document.getElementById('at-qp-'+partId)?.value)||0;
+  const qr=parseInt(document.getElementById('at-qr-'+partId)?.value)||0;
+  const note=(document.getElementById('at-note-'+partId)?.value||'').trim();
+  const inProg=_atProgress.find(p=>p.part_id===partId&&p.status==='in_progress');
+  const targetStep=inProg?.step||'assy';
+  try{
+    const existing=_atProgress.find(p=>p.part_id===partId&&p.step===targetStep);
+    if(existing){
+      await sb.from('part_progress').update({qty_passed:qp,qty_rejected:qr,notes:note,updated_at:new Date().toISOString()}).eq('id',existing.id);
+      Object.assign(existing,{qty_passed:qp,qty_rejected:qr,notes:note});
+    }else{
+      const{data}=await sb.from('part_progress').insert({part_id:partId,step:targetStep,status:'in_progress',qty_passed:qp,qty_rejected:qr,notes:note}).select().single();
+      if(data)_atProgress.push(data);
+    }
+  }catch(e){alert('❌ Save error: '+e.message);return;}
+  _atPatchCard(partId);
+  alert('✅ Saved');
+}
+
+function _atPatchCard(partId){
+  const el=document.querySelector(`.at-card[data-part-id="${partId}"]`);
+  const part=_atParts.find(p=>p.id===partId);
+  if(!el||!part)return;
+  const wasOpen=document.getElementById('at-detail-'+partId)?.style.display==='block';
+  const tmp=document.createElement('div');
+  tmp.innerHTML=_atCardHtml(part);
+  const newCard=tmp.firstElementChild;
+  el.replaceWith(newCard);
+  if(wasOpen){const d=document.getElementById('at-detail-'+partId);if(d)d.style.display='block';}
+  _atUpdateProgressBar();
+}
+
+function _atUpdateProgressBar(){
+  const total=_atParts.length;
+  const done=_atParts.filter(p=>_atGetPartStatus(p.id)==='done').length;
+  const pct=total>0?Math.round(done/total*100):0;
+  const bar=document.getElementById('at-prog-bar'),pctEl=document.getElementById('at-prog-pct');
+  if(bar)bar.style.width=pct+'%';if(pctEl)pctEl.textContent=pct+'%';
+  const prob=_atParts.filter(p=>_atGetPartStatus(p.id)==='problem');
+  const al=document.getElementById('at-alert');
+  if(al){
+    if(prob.length){al.style.display='flex';al.innerHTML='🚨 พบปัญหา '+prob.length+' ชิ้น: '+prob.map(p=>esc(p.part_name)).slice(0,5).join(', ')+(prob.length>5?'…':'');}
+    else{al.style.display='none';}
+  }
+  const job=_atJobs.find(j=>j.id===_atJobId);
+  if(job){const el=document.getElementById('at-job-info');
+    if(el)el.innerHTML=
+      `<span>👥 ${esc(job.customer||'')}</span>`+
+      `<span>📋 PDC: ${esc(job.pdc_no||'')}</span>`+
+      `<span>🔩 ${total} parts</span>`+
+      `<span style="color:${pct===100?'#22c55e':'#60a5fa'};font-weight:700;">${pct}% Complete</span>`+
+      `<span>${done}/${total} Done</span>`;}
+}
+
+function _atSetFilter(f,el){
+  _atFilter=f;
+  document.querySelectorAll('.at-filter-btn').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  _atRender();
+}
+
+function _atToggleCompact(){
+  _atCompact=!_atCompact;
+  const btn=document.getElementById('at-compact-btn');
+  if(btn)btn.textContent=_atCompact?'📋 Full View':'📦 Compact';
+  _atRender();
+}
+// ─── End Assembly Tracker ──────────────────────────────────────
 
 // auto-load hooks are handled directly in nav onclick
 
