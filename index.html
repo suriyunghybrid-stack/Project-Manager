@@ -4593,6 +4593,125 @@ async function loadAssemblyTracker(){
   if(keepId){sel.value=keepId;await _atLoadParts(keepId);}
 }
 
+// ── Mock Data: 61 parts from PDF BOM (SO25-0678 / 712545-X7A09) ────
+function _atMockData(){
+  const J='demo-712545';
+  // [seq, part_no, part_name, material, mat_size, qty, phase]
+  // phase: 0=queue, 1..6=steps-in-progress (active step idx 0-based), 6=all done, -1=problem@qc
+  const D=[
+    [1,'A001','BASE PLATE','S50C','20x250x390',1,6],
+    [2,'A002','MAIN BLOCK','SS400','46x71x97',1,6],
+    [3,'A003','LOCATING PIN','SKD11','Ø20x25',1,6],
+    [4,'A004','CLAMP COLLAR','SKD11','Ø18x20',1,6],
+    [5,'A005','LOCATING CONE','SKD11','Ø26x37',1,6],
+    [6,'A006','LOCATING BUSH','SKD11','Ø16x25',1,6],
+    [7,'A007','ROUND PIN','SKD11','Ø9x33',1,6],
+    [8,'A008','KNOB','SS400','Ø20x23',1,6],
+    [9,'A009','LOCATING PLATE','S50C','6x30x45',1,4],
+    [10,'A010','LOCATING BLOCK','SKD11','9x31x39',1,4],
+    [11,'A011','BUSH','SKD11','Ø14x20',1,3],
+    [12,'A012','LOCATING PIN (L)','SKD11','Ø20x60',1,2],
+    [13,'A013','ROUND KNOB','SS400','Ø12x22',2,1],
+    [14,'A014','SUPPORT BLOCK','SS400','25x56x100',1,-1],
+    [15,'A015','LOCATING BUSH','SKD11','Ø17x33',1,2],
+    [16,'A016','STRAIGHT PIN','SKD11','Ø7x52',1,1],
+    [17,'A017','STOPPER KNOB','SS400','Ø17x30',1,1],
+    [18,'A018','VERTICAL POST','S50C','30x58x166',2,1],
+    [19,'A019','SLIDE PLATE','S50C','10x60x155',1,0],
+    [20,'A020','CLAMP PLATE','S50C','10x34x155',1,0],
+    [21,'A021','WASHER','S50C','Ø26x3',2,0],
+    [22,'A022','STUD','S50C','Ø16x40',2,0],
+    [23,'A023','BODY BLOCK','S50C','44x68x110',1,0],
+    [24,'A024','LOCATING BUSH','SKD11','Ø20x27',2,0],
+    [25,'A025','PIN','SKD11','Ø10x48',2,0],
+    [26,'A026','KNOB STUD','SS400','Ø20x30',1,0],
+    [27,'A027','BRACKET','SS400','24x72x75',1,0],
+    [28,'A028','CLAMP BUSH','SKD11','Ø25x24',1,0],
+    [29,'A029','TAPER PIN','SKD11','Ø12x32',1,0],
+    [30,'A030','HANDLE KNOB','SS400','Ø20x26',1,0],
+    [31,'A031','BLOCK','S50C','34x50x77',1,0],
+    [32,'A032','BRACKET','SS400','14x48x106',1,0],
+    [33,'A033','SMALL BLOCK','S50C','15x21x44',1,0],
+    [34,'A034','SUPPORT BLOCK','SS400','30x63x110',1,0],
+    [35,'A035','KNOB','SS400','Ø20x30',1,0],
+    [36,'A036','LOCATING BLOCK','SS400','36x52x75',1,0],
+    [37,'A037','FLAT PLATE','SKD11','5x20x36',1,0],
+    [38,'A038','BUSH','SKD11','Ø16x20',1,0],
+    [39,'A039','TAPER BUSH','SKD11','Ø10x32',1,0],
+    [40,'A040','BRACKET','SS400','31x40x78',1,0],
+    [41,'A041','BASE BLOCK','S50C','24x36x50',1,0],
+    [42,'A042','SIDE BLOCK','S50C','24x44x77',1,0],
+    [43,'A043','SUPPORT POST','SS400','30x47x92',1,0],
+    [44,'A044','STOPPER BLOCK','S50C','20x30x35',2,0],
+    [45,'A045','LATCH PLATE','S50C','37x13x70',1,0],
+    [46,'A046','HANDLE KNOB','SS400','Ø20x30',2,0],
+    [47,'A047','POST','SS400','30x47x100',1,0],
+    [48,'A048','CLAMP SLIDE','S50C','10x38x107',1,0],
+    [49,'A049','GO GAUGE 28.0/27.4','SKD11','5x30x45',1,0],
+    [50,'A050','NO-GO GAUGE 26.2/25.6','SKD11','5x28x45',1,0],
+    [51,'A051','TAPER GAUGE','SKD11','4x20x40',1,0],
+    [52,'A052','GO/NOGO PIN Ø8.0','SKD11','Ø12x80',1,0],
+    [53,'A053','GO/NOGO PIN Ø5.0','SKD11','Ø12x80',1,0],
+    [54,'A054','GO/NOGO PIN Ø20.3','SKD11','Ø21x100',1,0],
+    [55,'A055','GO/NOGO PIN Ø10.0','SKD11','Ø12x80',1,0],
+    [56,'A056','GO/NOGO PIN 6.8x11.8','SKD11','Ø14x80',1,0],
+    [57,'A057','GO/NOGO PIN Ø8.5','SKD11','Ø12x80',1,0],
+    [58,'A058','SHAFT','SS400','Ø14x80',1,0],
+    [59,'A059','SPRING PIN KRBSDP 3-60','STD','—',1,0],
+    [60,'A060','SPRING PIN KRBSDP 3.5-60','STD','—',1,0],
+    [61,'A061','EPOXY BASE','EPOXY GRAY','40x150x340',1,0]
+  ];
+
+  const parts=D.map(([seq,no,name,mat,size,qty])=>({
+    id:'dp-'+no,job_id:J,seq_no:seq,part_no:no,part_name:name,
+    material:mat,mat_size:size,qty_required:qty,image_url:null
+  }));
+
+  const ALLSTEPS=['saw','lathe','drill','ht','assy','qc'];
+  const progress=[];
+
+  D.forEach(([seq,no,name,mat,size,qty,phase])=>{
+    if(phase===0)return; // queue — no records needed
+    const pid='dp-'+no;
+    const isHT=mat==='SKD11';
+    const isPurch=mat==='STD'||mat==='EPOXY GRAY';
+    // Active steps this material goes through (in order)
+    const active=isPurch?['assy','qc']:isHT?['saw','lathe','drill','ht','assy','qc']:['saw','lathe','drill','assy','qc'];
+
+    ALLSTEPS.forEach(step=>{
+      const ai=active.indexOf(step); // -1 = N/A for this material
+      let status,qp=0,qr=0,note='';
+
+      if(ai<0){
+        // N/A step: only add record if part has started
+        status='na';
+      }else if(phase===-1){
+        // Problem at QC: all active steps done, QC = problem
+        if(step==='qc'){status='problem';qr=1;note='ไม่ผ่าน CMM — dimension out of tolerance';}
+        else{status='done';qp=qty;}
+      }else if(phase===6){
+        status='done';qp=qty;
+        if(step==='qc')note='Passed ✅';
+      }else{
+        // phase 1 = first active step is in_progress
+        // phase 2 = first done, second in_progress, etc.
+        if(ai<phase-1){status='done';qp=qty;}
+        else if(ai===phase-1){
+          status='in_progress';
+          if(step==='ht')note='Waiting furnace slot';
+          else if(step==='drill')note='กำลังเจาะรู Ø8 / Ø12';
+          else if(step==='lathe')note='กำลังกลึง OD → กลึง ID';
+          else if(step==='assy')note='กำลังประกอบ sub-assy';
+        }else{return;} // future step — no record
+      }
+      progress.push({id:'dr-'+no+'-'+step,part_id:pid,step,status,qty_passed:qp,qty_rejected:qr,notes:note});
+    });
+  });
+
+  return{parts,progress};
+}
+// ── End Mock Data ──────────────────────────────────────────────
+
 async function _atLoadParts(jobId){
   _atJobId=jobId||null;
   const body=document.getElementById('at-body');
@@ -4609,7 +4728,13 @@ async function _atLoadParts(jobId){
       const rRes=await sb.from('part_progress').select('*').in('part_id',ids);
       _atProgress=rRes.data||[];
     }else{_atProgress=[];}
-  }catch(e){console.warn('AT load error',e);_atParts=[];_atProgress=[];}
+  }catch(e){
+    console.warn('AT load error',e);
+    if(jobId==='demo-712545'){const m=_atMockData();_atParts=m.parts;_atProgress=m.progress;}
+    else{_atParts=[];_atProgress=[];}
+  }
+  // Fallback: table exists but empty in demo mode
+  if(!_atParts.length&&jobId==='demo-712545'){const m=_atMockData();_atParts=m.parts;_atProgress=m.progress;}
   _atRender();
 }
 
