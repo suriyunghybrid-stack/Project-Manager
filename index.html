@@ -793,22 +793,31 @@ select.form-input option{background:#fff;}
 /* ── End Machine Load Gantt ───────────────────────────────────── */
 
 /* ── Assembly Tracker ─────────────────────────────────────────── */
-#page-assembly{padding:0;}
-.at-header{background:var(--surface);border-bottom:1.5px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.at-job-sel{flex:1;min-width:220px;padding:8px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;}
-.at-job-info{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text-muted);}
-.at-prog-wrap{padding:10px 20px;background:var(--surface);border-bottom:1.5px solid var(--border);}
-.at-prog-bar-bg{height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-top:4px;}
+#page-assembly{padding:0;display:flex;flex-direction:column;height:100%;}
+.at-header{background:var(--surface);border-bottom:1.5px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;}
+.at-job-sel{flex:1;min-width:200px;padding:7px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;}
+.at-split{display:flex;flex:1;overflow:hidden;min-height:0;}
+.at-left{width:272px;flex-shrink:0;overflow-y:auto;border-right:1.5px solid var(--border);background:var(--surface);display:flex;flex-direction:column;}
+.at-right{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.at-jig-wrap{padding:12px;border-bottom:1.5px solid var(--border);background:var(--bg);flex-shrink:0;}
+.at-jig-wrap img{width:100%;max-height:185px;object-fit:contain;cursor:zoom-in;border-radius:8px;transition:opacity .15s;display:block;background:#fff;}
+.at-jig-wrap img:hover{opacity:.82;}
+.at-jig-label{font-size:10px;color:var(--text-muted);text-align:center;margin-top:5px;}
+.at-left-stats{padding:14px 12px;display:flex;flex-direction:column;gap:8px;flex:1;}
+.at-prog-bar-bg{height:8px;background:var(--border);border-radius:5px;overflow:hidden;}
 .at-prog-bar{height:100%;background:linear-gradient(90deg,#3b82f6,#22c55e);border-radius:5px;transition:width .5s;}
-.at-alert{margin:10px 20px;padding:10px 16px;background:#7f1d1d;border:1.5px solid #ef4444;border-radius:8px;color:#fca5a5;font-size:13px;font-weight:600;display:none;align-items:center;gap:8px;}
-.at-toolbar{padding:10px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1.5px solid var(--border);}
-.at-filter-btn{padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;cursor:pointer;color:var(--text);transition:all .15s;white-space:nowrap;}
+.at-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.at-stat-box{padding:7px 6px;border-radius:8px;font-size:11px;text-align:center;border:1px solid var(--border);line-height:1.5;}
+.at-alert{padding:8px 14px;background:#7f1d1d;border-bottom:1.5px solid #ef4444;color:#fca5a5;font-size:12px;font-weight:600;display:none;align-items:center;gap:6px;flex-shrink:0;}
+.at-toolbar{padding:8px 14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-bottom:1.5px solid var(--border);flex-shrink:0;background:var(--surface);}
+.at-filter-btn{padding:5px 12px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;cursor:pointer;color:var(--text);transition:all .15s;white-space:nowrap;}
 .at-filter-btn:hover{border-color:var(--primary);color:var(--primary);}
 .at-filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
-.at-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px 20px;overflow-y:auto;max-height:calc(100vh - 230px);}
-@media(max-width:1200px){.at-grid{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:700px){.at-grid{grid-template-columns:1fr;}}
-.at-grid.compact{grid-template-columns:1fr;gap:4px;padding:10px 20px;}
+.at-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:14px;overflow-y:auto;flex:1;}
+@media(max-width:1500px){.at-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:950px){.at-left{width:220px;}.at-grid{grid-template-columns:1fr;}}
+@media(max-width:650px){.at-split{flex-direction:column;}.at-left{width:100%;border-right:none;border-bottom:1.5px solid var(--border);}.at-jig-wrap img{max-height:120px;}}
+.at-grid.compact{grid-template-columns:1fr;gap:4px;padding:8px 14px;}
 .at-card{background:var(--surface);border-radius:10px;overflow:hidden;border:1.5px solid var(--border);transition:box-shadow .2s;}
 .at-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.25);}
 .at-card-header{padding:12px;cursor:pointer;user-select:none;}
@@ -1315,48 +1324,49 @@ select.form-input option{background:#fff;}
 
       <!-- ══════════════ ASSEMBLY TRACKER PAGE ══════════════ -->
       <div id="page-assembly" class="page">
-        <!-- Header: Job Selector -->
+        <!-- Header: full-width job selector -->
         <div class="at-header">
-          <span style="font-size:20px;flex-shrink:0;">🔩</span>
-          <span style="font-weight:700;font-size:15px;white-space:nowrap;">Assembly Tracker</span>
+          <span style="font-size:18px;flex-shrink:0;">🔩</span>
+          <span style="font-weight:700;font-size:14px;white-space:nowrap;">Assembly Tracker</span>
           <select id="at-job-sel" class="at-job-sel" onchange="_atLoadParts(this.value)">
             <option value="">-- เลือก Assembly Job --</option>
           </select>
-          <div id="at-job-info" class="at-job-info"></div>
         </div>
-        <!-- Progress Bar -->
-        <div class="at-prog-wrap">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Overall Parts Progress</span>
-            <span id="at-prog-pct" style="font-size:13px;font-weight:700;color:#60a5fa;">0%</span>
+        <!-- Split Panel -->
+        <div class="at-split">
+          <!-- LEFT: jig image + stats -->
+          <div class="at-left">
+            <div class="at-jig-wrap">
+              <img src="/parts-images/full-jig.png" alt="Assembly Jig Drawing" onclick="_atShowJig()" title="คลิกเพื่อดูแบบเต็ม">
+              <div class="at-jig-label">📐 คลิกเพื่อขยาย</div>
+            </div>
+            <div class="at-left-stats" id="at-left-stats">
+              <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px 0;">เลือก Job เพื่อดูข้อมูล</div>
+            </div>
           </div>
-          <div class="at-prog-bar-bg">
-            <div class="at-prog-bar" id="at-prog-bar" style="width:0%"></div>
+          <!-- RIGHT: filters + cards -->
+          <div class="at-right">
+            <div class="at-alert" id="at-alert">🚨 พบปัญหา</div>
+            <div class="at-toolbar">
+              <button class="at-filter-btn active" onclick="_atSetFilter('all',this)">All</button>
+              <button class="at-filter-btn" onclick="_atSetFilter('in_progress',this)">🔵 In Progress</button>
+              <button class="at-filter-btn" onclick="_atSetFilter('problem',this)">🔴 Problem</button>
+              <button class="at-filter-btn" onclick="_atSetFilter('done',this)">✅ Done</button>
+              <button class="at-filter-btn" onclick="_atSetFilter('queue',this)">🟡 Queue</button>
+              <div style="flex:1;"></div>
+              <button class="at-filter-btn" id="at-compact-btn" onclick="_atToggleCompact()">📦 Compact</button>
+              <button class="at-filter-btn" onclick="loadAssemblyTracker()" title="Refresh data">🔄 Refresh</button>
+            </div>
+            <div class="at-grid" id="at-body">
+              <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);font-size:14px;">
+                🔩 เลือก Assembly Job เพื่อดูชิ้นส่วนทั้งหมด
+              </div>
+            </div>
           </div>
         </div>
-        <!-- Alert Bar -->
-        <div class="at-alert" id="at-alert">🚨 พบปัญหา</div>
-        <!-- Toolbar -->
-        <div class="at-toolbar">
-          <button class="at-filter-btn active" onclick="_atSetFilter('all',this)">All</button>
-          <button class="at-filter-btn" onclick="_atSetFilter('in_progress',this)">🔵 In Progress</button>
-          <button class="at-filter-btn" onclick="_atSetFilter('problem',this)">🔴 Problem</button>
-          <button class="at-filter-btn" onclick="_atSetFilter('done',this)">✅ Done</button>
-          <button class="at-filter-btn" onclick="_atSetFilter('queue',this)">🟡 Queue</button>
-          <div style="flex:1;"></div>
-          <button class="at-filter-btn" id="at-compact-btn" onclick="_atToggleCompact()">📦 Compact</button>
-          <button class="at-filter-btn" onclick="_atShowJig()" title="View full assembly jig drawing">📐 Assembly Drawing</button>
-          <button class="at-filter-btn" onclick="loadAssemblyTracker()" title="Refresh data">🔄 Refresh</button>
-        </div>
-        <!-- Part Cards Grid -->
-        <div class="at-grid" id="at-body">
-          <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);font-size:14px;">
-            🔩 เลือก Assembly Job เพื่อดูชิ้นส่วนทั้งหมด
-          </div>
-        </div>
-        <!-- Jig Drawing Modal -->
+        <!-- Jig Drawing Lightbox -->
         <div id="at-jig-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:12px;" onclick="if(event.target===this||event.target.id==='at-jig-modal')this.style.display='none'">
-          <div style="color:#fff;font-size:13px;font-weight:600;opacity:0.7;">📐 Assembly Jig Drawing — 712545-X7A09 &nbsp;|&nbsp; คลิกพื้นหลังเพื่อปิด</div>
+          <div style="color:#fff;font-size:13px;font-weight:600;opacity:0.7;">📐 Assembly Jig Drawing &nbsp;|&nbsp; คลิกพื้นหลังเพื่อปิด</div>
           <img src="/parts-images/full-jig.png" style="max-width:92vw;max-height:85vh;border-radius:10px;box-shadow:0 8px 48px rgba(0,0,0,0.7);background:#fff;">
         </div>
       </div><!-- end page-assembly -->
@@ -4745,10 +4755,10 @@ async function _atLoadParts(jobId){
 }
 
 function _atClearHeader(){
-  const pctEl=document.getElementById('at-prog-pct'),bar=document.getElementById('at-prog-bar');
-  const info=document.getElementById('at-job-info'),alert=document.getElementById('at-alert');
-  if(pctEl)pctEl.textContent='0%';if(bar)bar.style.width='0%';
-  if(info)info.innerHTML='';if(alert)alert.style.display='none';
+  const alert=document.getElementById('at-alert');
+  if(alert)alert.style.display='none';
+  const stats=document.getElementById('at-left-stats');
+  if(stats)stats.innerHTML='<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px 0;">เลือก Job เพื่อดูข้อมูล</div>';
 }
 
 function _atGetPartStatus(partId){
@@ -4765,19 +4775,23 @@ function _atRender(){
   const job=_atJobs.find(j=>j.id===_atJobId);
   const total=_atParts.length;
   const done=_atParts.filter(p=>_atGetPartStatus(p.id)==='done').length;
-  const pct=total>0?Math.round(done/total*100):0;
-  const bar=document.getElementById('at-prog-bar'),pctEl=document.getElementById('at-prog-pct');
-  if(bar)bar.style.width=pct+'%';if(pctEl)pctEl.textContent=pct+'%';
-  if(job){
-    const el=document.getElementById('at-job-info');
-    if(el)el.innerHTML=
-      `<span>👥 ${esc(job.customer||'')}</span>`+
-      `<span>📋 PDC: ${esc(job.pdc_no||'')}</span>`+
-      `<span>🔩 ${total} parts</span>`+
-      `<span style="color:${pct===100?'#22c55e':'#60a5fa'};font-weight:700;">${pct}% Complete</span>`+
-      `<span>${done}/${total} Done</span>`;
-  }
   const prob=_atParts.filter(p=>_atGetPartStatus(p.id)==='problem');
+  const inprog=_atParts.filter(p=>_atGetPartStatus(p.id)==='in_progress').length;
+  const queue=_atParts.filter(p=>_atGetPartStatus(p.id)==='queue').length;
+  const pct=total>0?Math.round(done/total*100):0;
+  const stats=document.getElementById('at-left-stats');
+  if(stats&&job){stats.innerHTML=
+    `<div style="font-weight:700;font-size:13px;color:var(--text);">${esc(job.assembly_no||job.id||'')}</div>`+
+    `<div style="font-size:11px;color:var(--text-muted);">👥 ${esc(job.customer||'')}</div>`+
+    `<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">📋 ${esc(job.pdc_no||'')}</div>`+
+    `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px;"><span>Overall Progress</span><span style="font-weight:700;color:${pct===100?'#22c55e':'#60a5fa'};" id="at-prog-pct">${pct}%</span></div>`+
+    `<div class="at-prog-bar-bg"><div class="at-prog-bar" id="at-prog-bar" style="width:${pct}%"></div></div>`+
+    `<div class="at-stat-grid" style="margin-top:10px;">`+
+    `<div class="at-stat-box" style="color:#22c55e;border-color:#22c55e40;">✅ Done<br><strong id="at-stat-done">${done}</strong></div>`+
+    `<div class="at-stat-box" style="color:#60a5fa;border-color:#60a5fa40;">🔵 In Prog<br><strong id="at-stat-inprog">${inprog}</strong></div>`+
+    `<div class="at-stat-box" style="color:#ef4444;border-color:#ef444440;">🔴 Problem<br><strong id="at-stat-prob">${prob.length}</strong></div>`+
+    `<div class="at-stat-box" style="color:#facc15;border-color:#facc1540;">🟡 Queue<br><strong id="at-stat-queue">${queue}</strong></div>`+
+    `</div>`;}
   const al=document.getElementById('at-alert');
   if(al){
     if(prob.length){al.style.display='flex';al.innerHTML='🚨 พบปัญหา '+prob.length+' ชิ้น: '+prob.map(p=>esc(p.part_name)).slice(0,5).join(', ')+(prob.length>5?'…':'');}
@@ -4809,7 +4823,7 @@ function _atCardHtml(part){
       <span class="at-badge" style="background:${sc}20;color:${sc};border:1px solid ${sc}40;flex-shrink:0;">${sl}</span>
     </div>`;}
   const img=part.image_url
-    ?`<img src="${esc(part.image_url)}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:8px;" onerror="this.style.display='none'">`
+    ?`<img src="${esc(part.image_url)}" style="width:100%;height:115px;object-fit:contain;border-radius:6px;margin-bottom:8px;background:#fff;" onerror="this.style.display='none'">`
     :`<div style="display:flex;align-items:center;justify-content:center;height:52px;font-size:34px;opacity:.3;margin-bottom:8px;">⚙️</div>`;
   return`<div class="at-card" style="border-top:3px solid ${sc};" data-part-id="${part.id}">
     <div class="at-card-header" onclick="_atToggleCard('${part.id}')">
@@ -4921,23 +4935,22 @@ function _atPatchCard(partId){
 function _atUpdateProgressBar(){
   const total=_atParts.length;
   const done=_atParts.filter(p=>_atGetPartStatus(p.id)==='done').length;
+  const prob=_atParts.filter(p=>_atGetPartStatus(p.id)==='problem');
+  const inprog=_atParts.filter(p=>_atGetPartStatus(p.id)==='in_progress').length;
+  const queue=_atParts.filter(p=>_atGetPartStatus(p.id)==='queue').length;
   const pct=total>0?Math.round(done/total*100):0;
   const bar=document.getElementById('at-prog-bar'),pctEl=document.getElementById('at-prog-pct');
-  if(bar)bar.style.width=pct+'%';if(pctEl)pctEl.textContent=pct+'%';
-  const prob=_atParts.filter(p=>_atGetPartStatus(p.id)==='problem');
+  if(bar)bar.style.width=pct+'%';
+  if(pctEl){pctEl.textContent=pct+'%';pctEl.style.color=pct===100?'#22c55e':'#60a5fa';}
+  const sd=document.getElementById('at-stat-done'),si=document.getElementById('at-stat-inprog');
+  const sp=document.getElementById('at-stat-prob'),sq=document.getElementById('at-stat-queue');
+  if(sd)sd.textContent=done;if(si)si.textContent=inprog;
+  if(sp)sp.textContent=prob.length;if(sq)sq.textContent=queue;
   const al=document.getElementById('at-alert');
   if(al){
     if(prob.length){al.style.display='flex';al.innerHTML='🚨 พบปัญหา '+prob.length+' ชิ้น: '+prob.map(p=>esc(p.part_name)).slice(0,5).join(', ')+(prob.length>5?'…':'');}
     else{al.style.display='none';}
   }
-  const job=_atJobs.find(j=>j.id===_atJobId);
-  if(job){const el=document.getElementById('at-job-info');
-    if(el)el.innerHTML=
-      `<span>👥 ${esc(job.customer||'')}</span>`+
-      `<span>📋 PDC: ${esc(job.pdc_no||'')}</span>`+
-      `<span>🔩 ${total} parts</span>`+
-      `<span style="color:${pct===100?'#22c55e':'#60a5fa'};font-weight:700;">${pct}% Complete</span>`+
-      `<span>${done}/${total} Done</span>`;}
 }
 
 function _atSetFilter(f,el){
