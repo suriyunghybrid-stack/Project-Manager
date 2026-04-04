@@ -1345,6 +1345,7 @@ select.form-input option{background:#fff;}
           <button class="at-filter-btn" onclick="_atSetFilter('queue',this)">🟡 Queue</button>
           <div style="flex:1;"></div>
           <button class="at-filter-btn" id="at-compact-btn" onclick="_atToggleCompact()">📦 Compact</button>
+          <button class="at-filter-btn" onclick="_atShowJig()" title="View full assembly jig drawing">📐 Assembly Drawing</button>
           <button class="at-filter-btn" onclick="loadAssemblyTracker()" title="Refresh data">🔄 Refresh</button>
         </div>
         <!-- Part Cards Grid -->
@@ -1352,6 +1353,11 @@ select.form-input option{background:#fff;}
           <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);font-size:14px;">
             🔩 เลือก Assembly Job เพื่อดูชิ้นส่วนทั้งหมด
           </div>
+        </div>
+        <!-- Jig Drawing Modal -->
+        <div id="at-jig-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:12px;" onclick="if(event.target===this||event.target.id==='at-jig-modal')this.style.display='none'">
+          <div style="color:#fff;font-size:13px;font-weight:600;opacity:0.7;">📐 Assembly Jig Drawing — 712545-X7A09 &nbsp;|&nbsp; คลิกพื้นหลังเพื่อปิด</div>
+          <img src="/parts-images/full-jig.png" style="max-width:92vw;max-height:85vh;border-radius:10px;box-shadow:0 8px 48px rgba(0,0,0,0.7);background:#fff;">
         </div>
       </div><!-- end page-assembly -->
 
@@ -4664,7 +4670,7 @@ function _atMockData(){
 
   const parts=D.map(([seq,no,name,mat,size,qty])=>({
     id:'dp-'+no,job_id:J,seq_no:seq,part_no:no,part_name:name,
-    material:mat,mat_size:size,qty_required:qty,image_url:null
+    material:mat,mat_size:size,qty_required:qty,image_url:'/parts-images/'+no+'.png'
   }));
 
   const ALLSTEPS=['saw','lathe','drill','ht','assy','qc'];
@@ -4946,6 +4952,10 @@ function _atToggleCompact(){
   const btn=document.getElementById('at-compact-btn');
   if(btn)btn.textContent=_atCompact?'📋 Full View':'📦 Compact';
   _atRender();
+}
+function _atShowJig(){
+  const m=document.getElementById('at-jig-modal');
+  if(m){m.style.display='flex';}
 }
 // ─── End Assembly Tracker ──────────────────────────────────────
 
